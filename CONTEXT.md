@@ -29,3 +29,28 @@ _Avoid:_ task, ticket, slice
 **Checkpoint** — A point where the human must approve before work goes on. There are two: after the Requirements issue, and after the Tech Lead's plan.
 
 **Retry** — Sending a Step back to the Developer after a failed test or a FIX review. At most 2 per Step, then the human is asked.
+
+## Messaging
+
+**Internal EMS** — The Solace broker. Internal applications publish and subscribe here.
+_Avoid:_ Solace side, inside broker
+
+**External EMS** — The RabbitMQ broker in the DMZ. External EMSs and outside applications connect here.
+_Avoid:_ Rabbit side, DMZ broker
+
+**Bridge** — The application that moves messages between the Internal EMS and the External EMS, in both directions.
+_Avoid:_ connector, relay, shovel
+
+**Outbound** — The direction from the Internal EMS to the External EMS.
+
+**Inbound** — The direction from the External EMS to the Internal EMS.
+
+**SWIM topic** — A topic name that follows the SWIM naming convention, `t/<country>/<organisation>/<environment>/<system>/<version>/...`, with `/` between levels.
+
+**Routing key** — The name a message carries on the External EMS. It is the same string as a SWIM topic, `/` included (see ADR 0002).
+
+**Bridge Rule** — One mapping the Bridge follows: a direction, a source prefix, and a target prefix. The part of the name after the source prefix is kept as it is. When the two prefixes are equal, the name is the same on both brokers.
+_Avoid:_ route, mapping entry
+
+**Durable Topic Endpoint** — A place on the Internal EMS that keeps the messages of one topic subscription while the Bridge is away. Each Outbound Bridge Rule has one.
+_Avoid:_ DTE (in prose), durable subscriber
