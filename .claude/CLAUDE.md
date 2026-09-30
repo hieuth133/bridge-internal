@@ -8,3 +8,21 @@ In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the re
 
 If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
 <!-- CODEGRAPH_END -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues (hieuth133/bridge-internal) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+
+## Workflow
+
+Build features with `/feature "<idea>"` (`.claude/skills/feature/SKILL.md`). Roles: `ba`, `tech-lead`, `reviewer` (Claude Opus, `.claude/agents/`) and `tester`, `developer` (Gemini Flash via `agy`, `.agents/agents/`). Terms: `CONTEXT.md`. Why this split: `docs/adr/0001-agy-flash-for-doing-roles.md`.
