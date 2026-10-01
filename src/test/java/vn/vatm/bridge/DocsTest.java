@@ -25,4 +25,16 @@ class DocsTest {
             assertTrue(readme.contains(needle), "README.md must mention: " + needle);
         }
     }
+
+    @Test
+    void readmeExplainsDemo() throws IOException {
+        Path readmeFile = Path.of("README.md");
+        assertTrue(Files.exists(readmeFile), "README.md missing");
+        String readme = Files.readString(readmeFile);
+        for (String needle : new String[] {"```mermaid", "q/vnm/vatm/dev/bridge/out-atfm",
+                "x.swim.dev.bridge.out", "x.swim.dev.bridge.in", "q/vnm/vatm/dev/bridge/in-dlq",
+                "t/vnm/vatm/dev/ext/met/metar", "## Demo", "## Add a Bridge Rule"}) {
+            assertTrue(readme.contains(needle), "README.md must mention: " + needle);
+        }
+    }
 }
