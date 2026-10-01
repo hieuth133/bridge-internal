@@ -32,6 +32,30 @@ public class BridgeRoutes extends RouteBuilder {
         SpringRabbitMQComponent rabbit = new SpringRabbitMQComponent();
         rabbit.setConnectionFactory(cf);
         getContext().addComponent("spring-rabbitmq", rabbit);
+
+        com.solacesystems.jms.SolConnectionFactory sol = com.solacesystems.jms.SolJmsUtility.createConnectionFactory();
+        sol.setHost(prop("solace.host"));
+        sol.setVPN(prop("solace.vpn"));
+        sol.setUsername(prop("solace.username"));
+        sol.setPassword(prop("solace.password"));
+        sol.setDynamicDurables(true);
+        sol.setDirectTransport(false);
+        var jmsCf = new org.springframework.jms.connection.CachingConnectionFactory(sol);
+        jmsCf.setCacheConsumers(false);
+        getContext().addComponent("jms", org.apache.camel.component.jms.JmsComponent.jmsComponent(jmsCf));
+
+        for (BridgeRule r : rules) {
+            if (r.direction() != BridgeRule.Direction.OUT) {
+                continue;
+            }
+            from("jms:topic:" + r.source() + ">?subscriptionDurable=true&durableSubscriptionName={{bridge.out.durable-prefix}}"
+                    + r.name() + "&disableReplyTo=true")
+                    .routeId("out-" + r.name())
+                    .process(e -> e.getMessage().setHeader("CamelSpringRabbitmqRoutingOverrideKey",
+                            r.map(e.getMessage().getHeader("JMSDestination", jakarta.jms.Topic.class).getTopicName())))
+                    .removeHeaders("JMS*")
+                    .to("spring-rabbitmq:{{bridge.out.exchange}}");
+        }
     }
 
     private String prop(String key) throws Exception {
