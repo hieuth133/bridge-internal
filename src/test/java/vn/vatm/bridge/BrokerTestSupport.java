@@ -164,6 +164,9 @@ public abstract class BrokerTestSupport {
             }
         }
         Map<String, String> props = new LinkedHashMap<>();
+        // Env vars (RABBITMQ_HOST, RABBITMQ_PASSWORD, ...) must never override these test values,
+        // or the Bridge would log in with the wrong password or reach a live broker.
+        props.put("camel.component.properties.environment-variable-mode", "0");
         props.put("bridge.rules", rules);
         props.put("bridge.out.exchange", "x.swim.dev.bridgetest.out");
         props.put("bridge.out.durable-prefix", "q/vnm/vatm/dev/bridgetest/out-");

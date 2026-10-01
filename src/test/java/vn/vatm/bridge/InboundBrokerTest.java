@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.GetResponse;
 import jakarta.jms.Message;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.TextMessage;
@@ -57,5 +58,17 @@ class InboundBrokerTest extends BrokerTestSupport {
         } finally {
             consumer.close();
         }
+    }
+
+    @Test
+    void unmatchedMessageGoesToDeadLetterQueueWithRoutingKeyHeader() throws Exception {
+        startBridge(RULES);
+        AMQP.BasicProperties props = new AMQP.BasicProperties.Builder().contentType("text/plain").build();
+        publishToRabbit(IN_EXCHANGE, "bridgetest/nomatch/metar", props, "lost-1".getBytes(StandardCharsets.UTF_8));
+
+        GetResponse r = awaitMessage("q/vnm/vatm/dev/bridgetest/in-dlq", 10000);
+        assertNotNull(r);
+        assertEquals("lost-1", new String(r.getBody(), StandardCharsets.UTF_8));
+        assertEquals("bridgetest/nomatch/metar", r.getProps().getHeaders().get("bridgeRoutingKey").toString());
     }
 }

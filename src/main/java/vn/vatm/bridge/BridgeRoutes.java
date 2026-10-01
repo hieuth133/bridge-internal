@@ -62,12 +62,18 @@ public class BridgeRoutes extends RouteBuilder {
                 .process(e -> {
                     String key = e.getMessage().getHeader("CamelSpringRabbitmqRoutingKey", String.class);
                     String target = BridgeRule.map(rules, BridgeRule.Direction.IN, key);
-                    if (target == null) {
-                        throw new IllegalStateException("No Bridge Rule for " + key);
+                    e.getMessage().setHeader("bridgeRoutingKey", key);
+                    if (target != null) {
+                        e.getMessage().setHeader("CamelJmsDestinationName", target);
                     }
-                    e.getMessage().setHeader("CamelJmsDestinationName", target);
                 })
-                .to("jms:topic:bridge-inbound");
+                .choice()
+                    .when(header("CamelJmsDestinationName").isNull())
+                        .to("spring-rabbitmq:default?routingKey={{bridge.in.dlq}}")
+                    .otherwise()
+                        .removeHeader("bridgeRoutingKey")
+                        .to("jms:topic:bridge-inbound")
+                .end();
     }
 
     private String prop(String key) throws Exception {
