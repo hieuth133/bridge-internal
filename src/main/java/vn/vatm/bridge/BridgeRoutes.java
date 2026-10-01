@@ -51,14 +51,17 @@ public class BridgeRoutes extends RouteBuilder {
             from("jms:topic:" + r.source() + ">?subscriptionDurable=true&durableSubscriptionName={{bridge.out.durable-prefix}}"
                     + r.name() + "&disableReplyTo=true")
                     .routeId("out-" + r.name())
+                    .filter(header("bridgeOrigin").isNull())
                     .process(e -> e.getMessage().setHeader("CamelSpringRabbitmqRoutingOverrideKey",
                             r.map(e.getMessage().getHeader("JMSDestination", jakarta.jms.Topic.class).getTopicName())))
                     .removeHeaders("JMS*")
+                    .setHeader("bridgeOrigin", constant("solace"))
                     .to("spring-rabbitmq:{{bridge.out.exchange}}");
         }
 
         from("spring-rabbitmq:{{bridge.in.exchange}}?queues={{bridge.in.queue}}&autoDeclare=false&disableReplyTo=true")
                 .routeId("in")
+                .filter(header("bridgeOrigin").isNull())
                 .process(e -> {
                     String key = e.getMessage().getHeader("CamelSpringRabbitmqRoutingKey", String.class);
                     String target = BridgeRule.map(rules, BridgeRule.Direction.IN, key);
@@ -72,6 +75,7 @@ public class BridgeRoutes extends RouteBuilder {
                         .to("spring-rabbitmq:default?routingKey={{bridge.in.dlq}}")
                     .otherwise()
                         .removeHeader("bridgeRoutingKey")
+                        .setHeader("bridgeOrigin", constant("rabbitmq"))
                         .to("jms:topic:bridge-inbound")
                 .end();
     }
