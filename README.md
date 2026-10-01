@@ -96,6 +96,8 @@ Với Docker thì chỉ cần `sudo systemctl enable --now docker`.
 5. Nếu Solace hay RabbitMQ của bạn khác mặc định, sửa luôn các tham số khác ở đây: `solace.host`, `solace.vpn`, `solace.username`, `rabbitmq.host`, `rabbitmq.port`, `rabbitmq.vhost`, `rabbitmq.username`.
 6. Chuột phải vào group `Solace RabbitMQ Bridge` → **Enable All Controller Services**, rồi chuột phải lần nữa → **Start**.
 
+Group con `Bridge demo` vẫn ở trạng thái Disabled, nó chỉ dùng cho phần [Demo](#demo).
+
 Bridge đã chạy. Trên mỗi processor, biểu tượng ▶ màu xanh nghĩa là đang chạy. Nếu có lỗi, một ô đỏ sẽ hiện ở góc processor; di chuột vào để đọc lỗi.
 
 ## Object
@@ -134,29 +136,101 @@ Mỗi processor gửi đi có một nhánh `failure` quay về chính nó. Khi b
 
 ## Demo
 
-Mở RabbitMQ UI `http://192.168.121.61:15672` (đăng nhập bằng tài khoản của bạn) và Solace Broker Manager `http://localhost:18080` (dùng công cụ Try-Me). Bridge phải đang chạy.
+Phần này demo trên UI rằng message mang header theo template Pathfinder (`docs/Documents/Pathfinder_Headers_Metadata_updated 24 Sep 2026.xlsx`, sheet "Headers for SIPG Test") đi qua Bridge mà không mất hay đổi header, và payload giữ nguyên. Muốn kiểm tra tự động, so từng byte, thì xem [Kiểm tra bằng script](#kiểm-tra-bằng-script).
 
-### Outbound
+Bạn dùng ba trang:
+- NiFi `https://<tên>:8443/nifi`
+- RabbitMQ UI `http://192.168.121.61:15672`
+- Solace Broker Manager `http://localhost:18080` (không bắt buộc)
 
-1. Trong RabbitMQ UI, tạo queue `q/vnm/vatm/dev/bridgedemo/userb`.
-2. Bind queue đó với exchange `x.swim.dev.bridge.out`, Routing key `t/vnm/vatm/dev/atfm/v1/fpl`.
-3. Trong Solace Try-Me, publish một message lên topic `t/vnm/vatm/dev/atfm/v1/fpl`.
-4. Trong RabbitMQ UI, mở queue `q/vnm/vatm/dev/bridgedemo/userb` và bấm **Get messages**. Message của bạn nằm ở đó.
+Phía Solace được demo bằng NiFi, vì Try-Me trong Broker Manager chỉ đặt được correlation id, priority, TTL và delivery mode, không đặt hay hiển thị được user property (header).
 
-### Inbound
+Trong group `Solace RabbitMQ Bridge` có sẵn group con **`Bridge demo`**, đi kèm `nifi/bridge-flow.json`. Mọi processor trong đó đang ở trạng thái Disabled, nên nó không gửi gì khi bạn Start Bridge. Group gồm:
 
-1. Trong Solace Try-Me, subscribe `t/vnm/vatm/dev/ext/>`.
-2. Trong RabbitMQ UI, mở exchange `x.swim.dev.bridge.in` và publish một message với Routing key `ext/met/metar`. Thêm một header, ví dụ `source` = `sgp`.
-3. Try-Me hiện message đó trên topic `t/vnm/vatm/dev/ext/met/metar`, có JMS property `source` = `sgp`.
+| Processor | Làm gì |
+|---|---|
+| `Solace sender: Pathfinder message` → `Solace sender: publish t/vnm/vatm/dev/atfm/v1/fpl` | Tạo message FIXM mẫu có đủ 14 header Pathfinder, gửi lên Solace. Bản đã gửi nằm lại ở connection `sent to Solace`. |
+| `Solace receiver: subscribe t/vnm/vatm/dev/ext/>` | Nhận message Bridge chuyển sang Solace. Message nhận được nằm ở connection `received from Solace`. |
+| `RabbitMQ sender: Pathfinder message` → `RabbitMQ sender: publish x.swim.dev.bridge.in` | Tạo cùng message mẫu, gửi vào exchange `x.swim.dev.bridge.in` với routing key lấy từ property `routingKey` (mặc định `ext/fixm/fpl`). Bản đã gửi nằm ở `sent to RabbitMQ`. |
 
-### Dead letter
+**Xem header và payload của một message trong NiFi:** chuột phải vào connection (mũi tên có tên, ví dụ `received from Solace`) → **List Queue**. Ở dòng message, bấm ⋮ → **View Details**. Tab **Attributes** là các header, nút **View** (hoặc ⋮ → **View Content**) mở payload.
 
-1. Trong RabbitMQ UI, publish một message vào `x.swim.dev.bridge.in` với Routing key `foo/bar`. Không Bridge Rule nào khớp với key này.
-2. Mở queue `q/vnm/vatm/dev/bridge/in-dlq` và bấm **Get messages**. Message nằm ở đó.
+**Sửa header hay payload mẫu:** chuột phải vào processor `... sender: Pathfinder message` → **Configure** → tab **Properties**. Mỗi header là một property: tên property là tên header, giá trị là giá trị header. Bấm **+** để thêm, biểu tượng thùng rác để xoá. Payload nằm ở property `Custom Text`.
+
+### Chuẩn bị
+
+1. NiFi: mở group `Solace RabbitMQ Bridge`. Chuột phải vào `Bridge demo` → **Enable**, rồi bấm đúp để mở group.
+2. Giữ Shift, chọn 3 processor `Solace receiver: ...`, `Solace sender: publish ...` và `RabbitMQ sender: publish ...`. Chuột phải → **Start**. Không Start cả group, vì như vậy hai processor `... Pathfinder message` sẽ gửi message ngay.
+3. RabbitMQ UI: tạo queue `q/vnm/vatm/dev/bridgedemo/userb` (Queues and Streams → Add a new queue). Mở queue đó → **Bindings** → From exchange `x.swim.dev.bridge.out`, Routing key `t/vnm/vatm/dev/atfm/v1/fpl` → **Bind**.
+
+   Phải làm bước này **trước** khi gửi Outbound. Nếu không có queue nào bind với routing key, RabbitMQ từ chối message (`NO_ROUTE`) và Bridge sẽ thử gửi lại mãi (xem [Vận hành](#vận-hành)).
+
+### 1. Outbound: Solace sang RabbitMQ
+
+1. NiFi: chuột phải vào `Solace sender: Pathfinder message` → **Run Once**. Message được gửi lên Solace topic `t/vnm/vatm/dev/atfm/v1/fpl`.
+2. RabbitMQ UI: mở queue `q/vnm/vatm/dev/bridgedemo/userb` → **Get messages** → **Get Message(s)**.
+3. Kết quả mong đợi:
+   - Routing key là `t/vnm/vatm/dev/atfm/v1/fpl`.
+   - Mục **Properties** có `headers` với đủ 14 header (`APAC_SOURCE`, `APAC_RECIPIENT_LIST`, `APAC_CATEGORY`, `APAC_CATEGORY_VERSION`, `APAC_MESSAGE_TYPE`, `DEP_AIRPORT`, `ARR_AIRPORT`, `AIRLINE`, `ACID`, `GUFI`, `GUFI_NAMESPACE_IDENTIFIER`, `EOBT`, `FFICE_PHASE`, `APAC_TIMESTAMP`), và các giá trị giống hệt trong `sent to Solace`.
+   - Ngoài ra có `content_type: application/xml` và `delivery_mode: 2`.
+   - **Payload** giống hệt nội dung message đã gửi.
+
+### 2. Inbound: RabbitMQ sang Solace
+
+Cách nhanh, dùng message mẫu có sẵn 14 header:
+
+1. NiFi: chuột phải vào `RabbitMQ sender: Pathfinder message` → **Run Once**.
+2. Connection `received from Solace` hiện 1 message. **List Queue** → **View Details**:
+   - attribute `jms_destination` = `t/vnm/vatm/dev/ext/fixm/fpl`;
+   - đủ 14 header với giá trị như trong `sent to RabbitMQ`;
+   - `contentType` = `application/xml`, `jms.messagetype` = `TextMessage`.
+   - **View Content** cho thấy payload giống hệt.
+
+Cách tự gõ trong RabbitMQ UI:
+
+1. RabbitMQ UI: Exchanges → `x.swim.dev.bridge.in` → **Publish message**.
+   - Routing key: `ext/fixm/fpl`.
+   - Headers: mỗi dòng một header, ví dụ `APAC_SOURCE` = `VV_VATM`, `APAC_MESSAGE_TYPE` = `FILED_FLIGHT_PLAN`, `APAC_TIMESTAMP` = `VV_EEMS_OUT:1790873508104`. Kiểu chọn `String`.
+   - Properties: `content_type` = `application/xml`, `message_id` = `demo-2`.
+   - Payload: dán một đoạn XML bất kỳ.
+2. Bấm **Publish message**, rồi xem `received from Solace` như trên. Mỗi header bạn gõ hiện ra là một attribute cùng tên và cùng giá trị.
+
+Solace Try-Me (subscribe `t/vnm/vatm/dev/ext/>`) cũng nhận được message, nhưng chỉ hiện payload, không hiện header.
+
+### 3. Dead letter
+
+1. NiFi: chuột phải vào `RabbitMQ sender: Pathfinder message` → **Configure** → đổi `routingKey` thành `foo/fixm` → **Apply** → chuột phải → **Run Once**. Không Bridge Rule nào khớp với key này.
+2. RabbitMQ UI: mở queue `q/vnm/vatm/dev/bridge/in-dlq` → **Get messages**. Message nằm ở đó, với đủ 14 header và payload giữ nguyên.
+3. Đặt lại `routingKey` = `ext/fixm/fpl`.
 
 ### Dọn dẹp
 
-Xoá queue demo `q/vnm/vatm/dev/bridgedemo/userb` trong RabbitMQ UI.
+1. NiFi: chuột phải vào từng connection `sent to Solace`, `received from Solace` và `sent to RabbitMQ` → **Empty Queue**.
+2. Chuột phải vào nền trống trong group `Bridge demo` → **Stop**, rồi lại chuột phải → **Disable**. Group trở về như lúc mới nạp.
+3. RabbitMQ UI: xoá queue `q/vnm/vatm/dev/bridgedemo/userb` (mở queue → **Delete**).
+4. Lấy message demo ra khỏi `q/vnm/vatm/dev/bridge/in-dlq`: **Get messages** với Ack Mode `Automatic ack`. Chỉ dùng **Purge** khi chắc chắn trong queue chỉ có message demo.
+
+### Kiểm tra bằng script
+
+`nifi/check-headers.py` gửi một message có đủ 14 header Pathfinder (cả giá trị có dấu phẩy, dấu hai chấm, dấu `-`) và payload XML khoảng 19 KB (tiếng Việt, `→`, `&amp;`, dấu nháy, tab) qua cả ba đường. Rồi nó so từng header và từng byte payload. Chỉ cần Python 3 có sẵn trên máy, không cần thư viện nào thêm. Chạy trên máy có NiFi, khi Bridge đang chạy:
+
+```
+python3 nifi/check-headers.py
+```
+
+Script hỏi mật khẩu đăng nhập NiFi (hoặc đọc biến `NIFI_PASSWORD`). Nó không cần mật khẩu broker, vì nó tạo một group tạm trong NiFi dùng chính Parameter Context `bridge`. Mọi thứ nó tạo đều bị xoá khi chạy xong:
+- group tạm;
+- queue tạm `q/vnm/vatm/dev/bridgetest/check-headers`;
+- message test trong `in-dlq`. Message này chỉ bị xoá nếu queue không còn message nào khác, nếu không script để nó lại và báo.
+
+Kết quả đúng kết thúc bằng:
+
+```
+Messages arrived (outbound, inbound, dead letter): [1, 1, 1], expected [1, 1, 1]
+PASS
+```
+
+Mỗi header sai được in `FAIL` kèm giá trị đã gửi, và script thoát với mã 1. Các biến tuỳ chọn: `NIFI_URL` (mặc định `https://localhost:8443`), `NIFI_USERNAME` (mặc định `admin`), `RABBITMQ_MANAGEMENT_PORT` (mặc định `15672`).
 
 ## Những gì Bridge giữ lại
 
@@ -217,6 +291,10 @@ Lên phiên bản NiFi mới: xoá container cũ, rồi chạy lại lệnh ở 
 podman rm -f vatm-bridge
 podman run ... docker.io/apache/nifi:<phiên bản mới>
 ```
+
+Message Outbound không vào được queue nào: nếu không queue nào bind với routing key, RabbitMQ từ chối message (`NO_ROUTE`). Khi đó `Publish to RabbitMQ x.swim.dev.bridge.out` thử gửi lại mỗi giây, ghi lỗi `NO_ROUTE` vào log và hiện ô đỏ. Message không mất, nó chờ ở connection `failure` vòng quanh processor đó. Cách xử lý:
+- Bind một queue với routing key đó, message sẽ đi ngay.
+- Hoặc, nếu message không cần nữa: chuột phải vào connection vòng đó → **List Queue** để xem, rồi **Empty Queue** để bỏ.
 
 Gỡ hẳn Bridge (mất flow và các message đang chờ trong NiFi):
 

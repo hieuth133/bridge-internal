@@ -8,7 +8,1436 @@
       "x": 0.0,
       "y": 0.0
     },
-    "processGroups": [],
+    "processGroups": [
+      {
+        "identifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+        "instanceIdentifier": "f9dbeef4-01a0-1000-06d8-cdf4f082c2fc",
+        "name": "Bridge demo",
+        "comments": "Demo only. Every processor is disabled; see README section Demo.",
+        "position": {
+          "x": 1800.0,
+          "y": 0.0
+        },
+        "processGroups": [],
+        "remoteProcessGroups": [],
+        "processors": [
+          {
+            "identifier": "20d46a7a-0ccb-3b9f-a085-e67138432c73",
+            "instanceIdentifier": "f9dbef9e-01a0-1000-6eed-21a1acac9139",
+            "name": "RabbitMQ sender: Pathfinder message",
+            "comments": "",
+            "position": {
+              "x": 1000.0,
+              "y": 0.0
+            },
+            "type": "org.apache.nifi.processors.standard.GenerateFlowFile",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-standard-nar",
+              "version": "2.12.0"
+            },
+            "properties": {
+              "ACID": "HVN651",
+              "amqp$messageId": "demo-${now():toNumber()}",
+              "FFICE_PHASE": "FILED",
+              "amqp$contentType": "application/xml",
+              "Custom Text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<fx:Flight xmlns:fx=\"http://www.fixm.aero/flight/4.3\">\n  <fx:flightIdentification aircraftIdentification=\"HVN651\"/>\n  <fx:departure aerodrome=\"VVTS\">T\u00e2n S\u01a1n Nh\u1ea5t</fx:departure>\n  <fx:arrival aerodrome=\"WSSS\">Changi</fx:arrival>\n</fx:Flight>\n",
+              "APAC_CATEGORY": "FIXM",
+              "APAC_SOURCE": "VV_VATM",
+              "ARR_AIRPORT": "WSSS",
+              "AIRLINE": "HVN",
+              "GUFI": "ec5c6d8e-6b3b-4b6c-a3a6-2c1f6f3d9a10",
+              "APAC_MESSAGE_TYPE": "FILED_FLIGHT_PLAN",
+              "APAC_TIMESTAMP": "VV_EEMS_OUT:1790873508104",
+              "File Size": "0B",
+              "APAC_CATEGORY_VERSION": "FIXM_4_3_FF_ICE",
+              "DEP_AIRPORT": "VVTS",
+              "Batch Size": "1",
+              "Unique FlowFiles": "false",
+              "Mime Type": null,
+              "APAC_RECIPIENT_LIST": "WS_CAAS",
+              "EOBT": "2026-10-01T06:00:00Z",
+              "Character Set": "UTF-8",
+              "Data Format": "Text",
+              "routingKey": "ext/fixm/fpl",
+              "GUFI_NAMESPACE_IDENTIFIER": "FF-ICE"
+            },
+            "propertyDescriptors": {
+              "ACID": {
+                "name": "ACID",
+                "displayName": "ACID",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "amqp$messageId": {
+                "name": "amqp$messageId",
+                "displayName": "amqp$messageId",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "FFICE_PHASE": {
+                "name": "FFICE_PHASE",
+                "displayName": "FFICE_PHASE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "amqp$contentType": {
+                "name": "amqp$contentType",
+                "displayName": "amqp$contentType",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Custom Text": {
+                "name": "Custom Text",
+                "displayName": "Custom Text",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "APAC_CATEGORY": {
+                "name": "APAC_CATEGORY",
+                "displayName": "APAC_CATEGORY",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "APAC_SOURCE": {
+                "name": "APAC_SOURCE",
+                "displayName": "APAC_SOURCE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "ARR_AIRPORT": {
+                "name": "ARR_AIRPORT",
+                "displayName": "ARR_AIRPORT",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "AIRLINE": {
+                "name": "AIRLINE",
+                "displayName": "AIRLINE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "GUFI": {
+                "name": "GUFI",
+                "displayName": "GUFI",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "APAC_MESSAGE_TYPE": {
+                "name": "APAC_MESSAGE_TYPE",
+                "displayName": "APAC_MESSAGE_TYPE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "APAC_TIMESTAMP": {
+                "name": "APAC_TIMESTAMP",
+                "displayName": "APAC_TIMESTAMP",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "File Size": {
+                "name": "File Size",
+                "displayName": "File Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "APAC_CATEGORY_VERSION": {
+                "name": "APAC_CATEGORY_VERSION",
+                "displayName": "APAC_CATEGORY_VERSION",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "DEP_AIRPORT": {
+                "name": "DEP_AIRPORT",
+                "displayName": "DEP_AIRPORT",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Batch Size": {
+                "name": "Batch Size",
+                "displayName": "Batch Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Unique FlowFiles": {
+                "name": "Unique FlowFiles",
+                "displayName": "Unique FlowFiles",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Mime Type": {
+                "name": "Mime Type",
+                "displayName": "Mime Type",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "APAC_RECIPIENT_LIST": {
+                "name": "APAC_RECIPIENT_LIST",
+                "displayName": "APAC_RECIPIENT_LIST",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "EOBT": {
+                "name": "EOBT",
+                "displayName": "EOBT",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Character Set": {
+                "name": "Character Set",
+                "displayName": "Character Set",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Data Format": {
+                "name": "Data Format",
+                "displayName": "Data Format",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "routingKey": {
+                "name": "routingKey",
+                "displayName": "routingKey",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "GUFI_NAMESPACE_IDENTIFIER": {
+                "name": "GUFI_NAMESPACE_IDENTIFIER",
+                "displayName": "GUFI_NAMESPACE_IDENTIFIER",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              }
+            },
+            "style": {},
+            "schedulingPeriod": "1 day",
+            "schedulingStrategy": "TIMER_DRIVEN",
+            "executionNode": "ALL",
+            "penaltyDuration": "30 sec",
+            "yieldDuration": "1 sec",
+            "bulletinLevel": "WARN",
+            "runDurationMillis": 0,
+            "concurrentlySchedulableTaskCount": 1,
+            "autoTerminatedRelationships": [],
+            "scheduledState": "DISABLED",
+            "retryCount": 10,
+            "retriedRelationships": [],
+            "backoffMechanism": "PENALIZE_FLOWFILE",
+            "maxBackoffPeriod": "10 mins",
+            "componentType": "PROCESSOR",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "eb4b12a1-ceb7-34ec-91f3-7c1f07308dec",
+            "instanceIdentifier": "f9dbef74-01a0-1000-796b-dede36101d7f",
+            "name": "Solace receiver: subscribe t/vnm/vatm/dev/ext/>",
+            "comments": "",
+            "position": {
+              "x": 500.0,
+              "y": 0.0
+            },
+            "type": "org.apache.nifi.jms.processors.ConsumeJMS",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-jms-processors-nar",
+              "version": "2.12.0"
+            },
+            "properties": {
+              "JNDI Initial Context Factory Class": null,
+              "Destination Name": "t/vnm/vatm/dev/ext/>",
+              "JMS Connection Factory Implementation Class": null,
+              "Record Reader": null,
+              "JMS Client Libraries": null,
+              "Connection Factory Service": "140d353a-59e2-3a4f-9690-3759e28e17f8",
+              "Subscription Name": null,
+              "Error Queue Name": null,
+              "Durable Subscription": "false",
+              "Record Writer": null,
+              "Destination Type": "TOPIC",
+              "JNDI Provider URL": null,
+              "Acknowledgement Mode": "2",
+              "Output Strategy": "USE_VALUE",
+              "Password": "#{solace.password}",
+              "JMS SSL Context Service": null,
+              "User Name": "#{solace.username}",
+              "Timeout": "1 sec",
+              "Message Selector": null,
+              "Shared Subscription": "false",
+              "JNDI Name of the Connection Factory": null,
+              "Connection Client ID": null,
+              "JNDI / JMS Client Libraries": null,
+              "JNDI Principal": null,
+              "JMS Broker URI": null,
+              "Character Set": "UTF-8",
+              "Maximum Batch Size": "1"
+            },
+            "propertyDescriptors": {
+              "JNDI Initial Context Factory Class": {
+                "name": "JNDI Initial Context Factory Class",
+                "displayName": "JNDI Initial Context Factory Class",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Destination Name": {
+                "name": "Destination Name",
+                "displayName": "Destination Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS Connection Factory Implementation Class": {
+                "name": "JMS Connection Factory Implementation Class",
+                "displayName": "JMS Connection Factory Implementation Class",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Record Reader": {
+                "name": "Record Reader",
+                "displayName": "Record Reader",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS Client Libraries": {
+                "name": "JMS Client Libraries",
+                "displayName": "JMS Client Libraries",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false,
+                "resourceDefinition": {
+                  "cardinality": "MULTIPLE",
+                  "resourceTypes": [
+                    "DIRECTORY",
+                    "URL",
+                    "FILE"
+                  ]
+                }
+              },
+              "Connection Factory Service": {
+                "name": "Connection Factory Service",
+                "displayName": "Connection Factory Service",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Subscription Name": {
+                "name": "Subscription Name",
+                "displayName": "Subscription Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Error Queue Name": {
+                "name": "Error Queue Name",
+                "displayName": "Error Queue Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Durable Subscription": {
+                "name": "Durable Subscription",
+                "displayName": "Durable Subscription",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Record Writer": {
+                "name": "Record Writer",
+                "displayName": "Record Writer",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Destination Type": {
+                "name": "Destination Type",
+                "displayName": "Destination Type",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Provider URL": {
+                "name": "JNDI Provider URL",
+                "displayName": "JNDI Provider URL",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Acknowledgement Mode": {
+                "name": "Acknowledgement Mode",
+                "displayName": "Acknowledgement Mode",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Output Strategy": {
+                "name": "Output Strategy",
+                "displayName": "Output Strategy",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Password": {
+                "name": "Password",
+                "displayName": "Password",
+                "identifiesControllerService": false,
+                "sensitive": true,
+                "dynamic": false
+              },
+              "JMS SSL Context Service": {
+                "name": "JMS SSL Context Service",
+                "displayName": "JMS SSL Context Service",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "User Name": {
+                "name": "User Name",
+                "displayName": "User Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Timeout": {
+                "name": "Timeout",
+                "displayName": "Timeout",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Credentials": {
+                "name": "JNDI Credentials",
+                "displayName": "JNDI Credentials",
+                "identifiesControllerService": false,
+                "sensitive": true,
+                "dynamic": false
+              },
+              "Message Selector": {
+                "name": "Message Selector",
+                "displayName": "Message Selector",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Shared Subscription": {
+                "name": "Shared Subscription",
+                "displayName": "Shared Subscription",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Name of the Connection Factory": {
+                "name": "JNDI Name of the Connection Factory",
+                "displayName": "JNDI Name of the Connection Factory",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Connection Client ID": {
+                "name": "Connection Client ID",
+                "displayName": "Connection Client ID",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI / JMS Client Libraries": {
+                "name": "JNDI / JMS Client Libraries",
+                "displayName": "JNDI / JMS Client Libraries",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false,
+                "resourceDefinition": {
+                  "cardinality": "MULTIPLE",
+                  "resourceTypes": [
+                    "DIRECTORY",
+                    "URL",
+                    "FILE"
+                  ]
+                }
+              },
+              "JNDI Principal": {
+                "name": "JNDI Principal",
+                "displayName": "JNDI Principal",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS Broker URI": {
+                "name": "JMS Broker URI",
+                "displayName": "JMS Broker URI",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Character Set": {
+                "name": "Character Set",
+                "displayName": "Character Set",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Maximum Batch Size": {
+                "name": "Maximum Batch Size",
+                "displayName": "Maximum Batch Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              }
+            },
+            "style": {},
+            "schedulingPeriod": "0 sec",
+            "schedulingStrategy": "TIMER_DRIVEN",
+            "executionNode": "ALL",
+            "penaltyDuration": "30 sec",
+            "yieldDuration": "1 sec",
+            "bulletinLevel": "WARN",
+            "runDurationMillis": 0,
+            "concurrentlySchedulableTaskCount": 1,
+            "autoTerminatedRelationships": [],
+            "scheduledState": "DISABLED",
+            "retryCount": 10,
+            "retriedRelationships": [],
+            "backoffMechanism": "PENALIZE_FLOWFILE",
+            "maxBackoffPeriod": "10 mins",
+            "componentType": "PROCESSOR",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "0a31de6a-44d7-3ee6-9048-b2c1bd0d9d42",
+            "instanceIdentifier": "f9dbef47-01a0-1000-2181-7e2e5026cf05",
+            "name": "Solace sender: publish t/vnm/vatm/dev/atfm/v1/fpl",
+            "comments": "",
+            "position": {
+              "x": 0.0,
+              "y": 250.0
+            },
+            "type": "org.apache.nifi.jms.processors.PublishJMS",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-jms-processors-nar",
+              "version": "2.12.0"
+            },
+            "properties": {
+              "Attributes to Send as JMS Headers": "(?!(uuid|filename|path)$).*",
+              "JMS SSL Context Service": null,
+              "User Name": "#{solace.username}",
+              "JNDI Initial Context Factory Class": null,
+              "Message Body Type": "text",
+              "Allow Illegal Characters in Header Names": "true",
+              "Destination Name": "t/vnm/vatm/dev/atfm/v1/fpl",
+              "JMS Connection Factory Implementation Class": null,
+              "Record Reader": null,
+              "JMS Client Libraries": null,
+              "Connection Factory Service": "140d353a-59e2-3a4f-9690-3759e28e17f8",
+              "JNDI Name of the Connection Factory": null,
+              "Connection Client ID": null,
+              "JNDI / JMS Client Libraries": null,
+              "Record Writer": null,
+              "JNDI Principal": null,
+              "Destination Type": "TOPIC",
+              "JNDI Provider URL": null,
+              "JMS Broker URI": null,
+              "Character Set": "UTF-8",
+              "Password": "#{solace.password}",
+              "Maximum Batch Size": "1"
+            },
+            "propertyDescriptors": {
+              "Attributes to Send as JMS Headers": {
+                "name": "Attributes to Send as JMS Headers",
+                "displayName": "Attributes to Send as JMS Headers",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS SSL Context Service": {
+                "name": "JMS SSL Context Service",
+                "displayName": "JMS SSL Context Service",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "User Name": {
+                "name": "User Name",
+                "displayName": "User Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Initial Context Factory Class": {
+                "name": "JNDI Initial Context Factory Class",
+                "displayName": "JNDI Initial Context Factory Class",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Message Body Type": {
+                "name": "Message Body Type",
+                "displayName": "Message Body Type",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Allow Illegal Characters in Header Names": {
+                "name": "Allow Illegal Characters in Header Names",
+                "displayName": "Allow Illegal Characters in Header Names",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Credentials": {
+                "name": "JNDI Credentials",
+                "displayName": "JNDI Credentials",
+                "identifiesControllerService": false,
+                "sensitive": true,
+                "dynamic": false
+              },
+              "Destination Name": {
+                "name": "Destination Name",
+                "displayName": "Destination Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS Connection Factory Implementation Class": {
+                "name": "JMS Connection Factory Implementation Class",
+                "displayName": "JMS Connection Factory Implementation Class",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Record Reader": {
+                "name": "Record Reader",
+                "displayName": "Record Reader",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS Client Libraries": {
+                "name": "JMS Client Libraries",
+                "displayName": "JMS Client Libraries",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false,
+                "resourceDefinition": {
+                  "cardinality": "MULTIPLE",
+                  "resourceTypes": [
+                    "DIRECTORY",
+                    "URL",
+                    "FILE"
+                  ]
+                }
+              },
+              "Connection Factory Service": {
+                "name": "Connection Factory Service",
+                "displayName": "Connection Factory Service",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Name of the Connection Factory": {
+                "name": "JNDI Name of the Connection Factory",
+                "displayName": "JNDI Name of the Connection Factory",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Connection Client ID": {
+                "name": "Connection Client ID",
+                "displayName": "Connection Client ID",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI / JMS Client Libraries": {
+                "name": "JNDI / JMS Client Libraries",
+                "displayName": "JNDI / JMS Client Libraries",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false,
+                "resourceDefinition": {
+                  "cardinality": "MULTIPLE",
+                  "resourceTypes": [
+                    "DIRECTORY",
+                    "URL",
+                    "FILE"
+                  ]
+                }
+              },
+              "Record Writer": {
+                "name": "Record Writer",
+                "displayName": "Record Writer",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Principal": {
+                "name": "JNDI Principal",
+                "displayName": "JNDI Principal",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Destination Type": {
+                "name": "Destination Type",
+                "displayName": "Destination Type",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JNDI Provider URL": {
+                "name": "JNDI Provider URL",
+                "displayName": "JNDI Provider URL",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "JMS Broker URI": {
+                "name": "JMS Broker URI",
+                "displayName": "JMS Broker URI",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Character Set": {
+                "name": "Character Set",
+                "displayName": "Character Set",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Password": {
+                "name": "Password",
+                "displayName": "Password",
+                "identifiesControllerService": false,
+                "sensitive": true,
+                "dynamic": false
+              },
+              "Maximum Batch Size": {
+                "name": "Maximum Batch Size",
+                "displayName": "Maximum Batch Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              }
+            },
+            "style": {},
+            "schedulingPeriod": "0 sec",
+            "schedulingStrategy": "TIMER_DRIVEN",
+            "executionNode": "ALL",
+            "penaltyDuration": "30 sec",
+            "yieldDuration": "1 sec",
+            "bulletinLevel": "WARN",
+            "runDurationMillis": 0,
+            "concurrentlySchedulableTaskCount": 1,
+            "autoTerminatedRelationships": [],
+            "scheduledState": "DISABLED",
+            "retryCount": 10,
+            "retriedRelationships": [],
+            "backoffMechanism": "PENALIZE_FLOWFILE",
+            "maxBackoffPeriod": "10 mins",
+            "componentType": "PROCESSOR",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "0067fc02-7504-3c18-a4f4-427a3144f33c",
+            "instanceIdentifier": "f9dbef15-01a0-1000-ff92-5cdf8c4fc546",
+            "name": "Solace sender: Pathfinder message",
+            "comments": "",
+            "position": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "type": "org.apache.nifi.processors.standard.GenerateFlowFile",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-standard-nar",
+              "version": "2.12.0"
+            },
+            "properties": {
+              "ACID": "HVN651",
+              "FFICE_PHASE": "FILED",
+              "Custom Text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<fx:Flight xmlns:fx=\"http://www.fixm.aero/flight/4.3\">\n  <fx:flightIdentification aircraftIdentification=\"HVN651\"/>\n  <fx:departure aerodrome=\"VVTS\">T\u00e2n S\u01a1n Nh\u1ea5t</fx:departure>\n  <fx:arrival aerodrome=\"WSSS\">Changi</fx:arrival>\n</fx:Flight>\n",
+              "APAC_CATEGORY": "FIXM",
+              "APAC_SOURCE": "VV_VATM",
+              "ARR_AIRPORT": "WSSS",
+              "AIRLINE": "HVN",
+              "GUFI": "ec5c6d8e-6b3b-4b6c-a3a6-2c1f6f3d9a10",
+              "APAC_MESSAGE_TYPE": "FILED_FLIGHT_PLAN",
+              "APAC_TIMESTAMP": "VV_EEMS_OUT:1790873508104",
+              "File Size": "0B",
+              "APAC_CATEGORY_VERSION": "FIXM_4_3_FF_ICE",
+              "DEP_AIRPORT": "VVTS",
+              "Batch Size": "1",
+              "Unique FlowFiles": "false",
+              "Mime Type": null,
+              "APAC_RECIPIENT_LIST": "WS_CAAS",
+              "EOBT": "2026-10-01T06:00:00Z",
+              "Character Set": "UTF-8",
+              "contentType": "application/xml",
+              "Data Format": "Text",
+              "GUFI_NAMESPACE_IDENTIFIER": "FF-ICE"
+            },
+            "propertyDescriptors": {
+              "ACID": {
+                "name": "ACID",
+                "displayName": "ACID",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "FFICE_PHASE": {
+                "name": "FFICE_PHASE",
+                "displayName": "FFICE_PHASE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Custom Text": {
+                "name": "Custom Text",
+                "displayName": "Custom Text",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "APAC_CATEGORY": {
+                "name": "APAC_CATEGORY",
+                "displayName": "APAC_CATEGORY",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "APAC_SOURCE": {
+                "name": "APAC_SOURCE",
+                "displayName": "APAC_SOURCE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "ARR_AIRPORT": {
+                "name": "ARR_AIRPORT",
+                "displayName": "ARR_AIRPORT",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "AIRLINE": {
+                "name": "AIRLINE",
+                "displayName": "AIRLINE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "GUFI": {
+                "name": "GUFI",
+                "displayName": "GUFI",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "APAC_MESSAGE_TYPE": {
+                "name": "APAC_MESSAGE_TYPE",
+                "displayName": "APAC_MESSAGE_TYPE",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "APAC_TIMESTAMP": {
+                "name": "APAC_TIMESTAMP",
+                "displayName": "APAC_TIMESTAMP",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "File Size": {
+                "name": "File Size",
+                "displayName": "File Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "APAC_CATEGORY_VERSION": {
+                "name": "APAC_CATEGORY_VERSION",
+                "displayName": "APAC_CATEGORY_VERSION",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "DEP_AIRPORT": {
+                "name": "DEP_AIRPORT",
+                "displayName": "DEP_AIRPORT",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Batch Size": {
+                "name": "Batch Size",
+                "displayName": "Batch Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Unique FlowFiles": {
+                "name": "Unique FlowFiles",
+                "displayName": "Unique FlowFiles",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Mime Type": {
+                "name": "Mime Type",
+                "displayName": "Mime Type",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "APAC_RECIPIENT_LIST": {
+                "name": "APAC_RECIPIENT_LIST",
+                "displayName": "APAC_RECIPIENT_LIST",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "EOBT": {
+                "name": "EOBT",
+                "displayName": "EOBT",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Character Set": {
+                "name": "Character Set",
+                "displayName": "Character Set",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "contentType": {
+                "name": "contentType",
+                "displayName": "contentType",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "Data Format": {
+                "name": "Data Format",
+                "displayName": "Data Format",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "GUFI_NAMESPACE_IDENTIFIER": {
+                "name": "GUFI_NAMESPACE_IDENTIFIER",
+                "displayName": "GUFI_NAMESPACE_IDENTIFIER",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              }
+            },
+            "style": {},
+            "schedulingPeriod": "1 day",
+            "schedulingStrategy": "TIMER_DRIVEN",
+            "executionNode": "ALL",
+            "penaltyDuration": "30 sec",
+            "yieldDuration": "1 sec",
+            "bulletinLevel": "WARN",
+            "runDurationMillis": 0,
+            "concurrentlySchedulableTaskCount": 1,
+            "autoTerminatedRelationships": [],
+            "scheduledState": "DISABLED",
+            "retryCount": 10,
+            "retriedRelationships": [],
+            "backoffMechanism": "PENALIZE_FLOWFILE",
+            "maxBackoffPeriod": "10 mins",
+            "componentType": "PROCESSOR",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
+            "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0",
+            "name": "RabbitMQ sender: publish x.swim.dev.bridge.in",
+            "comments": "",
+            "position": {
+              "x": 1000.0,
+              "y": 250.0
+            },
+            "type": "org.apache.nifi.amqp.processors.PublishAMQP",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-amqp-nar",
+              "version": "2.12.0"
+            },
+            "properties": {
+              "Routing Key": "${routingKey}",
+              "Exchange Name": "x.swim.dev.bridge.in",
+              "Port": "#{rabbitmq.port}",
+              "Maximum Input FlowFile Size": "128 MB",
+              "Brokers": null,
+              "Host Name": "#{rabbitmq.host}",
+              "Headers Pattern": "(?!(uuid|filename|path|routingKey)$|amqp\\$).*",
+              "SSL Context Service": null,
+              "Delivery Guarantee": "AT_LEAST_ONCE",
+              "Header Separator": ",",
+              "AMQP Version": "0.9.1",
+              "Virtual Host": "#{rabbitmq.vhost}",
+              "Username": "#{rabbitmq.username}",
+              "Client Certificate Authentication Enabled": "false",
+              "Headers Source": "FLOWFILE_ATTRIBUTES",
+              "Password": "#{rabbitmq.password}"
+            },
+            "propertyDescriptors": {
+              "Routing Key": {
+                "name": "Routing Key",
+                "displayName": "Routing Key",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Exchange Name": {
+                "name": "Exchange Name",
+                "displayName": "Exchange Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Port": {
+                "name": "Port",
+                "displayName": "Port",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Maximum Input FlowFile Size": {
+                "name": "Maximum Input FlowFile Size",
+                "displayName": "Maximum Input FlowFile Size",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Brokers": {
+                "name": "Brokers",
+                "displayName": "Brokers",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Host Name": {
+                "name": "Host Name",
+                "displayName": "Host Name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Headers Pattern": {
+                "name": "Headers Pattern",
+                "displayName": "Headers Pattern",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "SSL Context Service": {
+                "name": "SSL Context Service",
+                "displayName": "SSL Context Service",
+                "identifiesControllerService": true,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Delivery Guarantee": {
+                "name": "Delivery Guarantee",
+                "displayName": "Delivery Guarantee",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Header Separator": {
+                "name": "Header Separator",
+                "displayName": "Header Separator",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "AMQP Version": {
+                "name": "AMQP Version",
+                "displayName": "AMQP Version",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Virtual Host": {
+                "name": "Virtual Host",
+                "displayName": "Virtual Host",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Username": {
+                "name": "Username",
+                "displayName": "Username",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Client Certificate Authentication Enabled": {
+                "name": "Client Certificate Authentication Enabled",
+                "displayName": "Client Certificate Authentication Enabled",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Headers Source": {
+                "name": "Headers Source",
+                "displayName": "Headers Source",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": false
+              },
+              "Password": {
+                "name": "Password",
+                "displayName": "Password",
+                "identifiesControllerService": false,
+                "sensitive": true,
+                "dynamic": false
+              }
+            },
+            "style": {},
+            "schedulingPeriod": "0 sec",
+            "schedulingStrategy": "TIMER_DRIVEN",
+            "executionNode": "ALL",
+            "penaltyDuration": "30 sec",
+            "yieldDuration": "1 sec",
+            "bulletinLevel": "WARN",
+            "runDurationMillis": 0,
+            "concurrentlySchedulableTaskCount": 1,
+            "autoTerminatedRelationships": [],
+            "scheduledState": "DISABLED",
+            "retryCount": 10,
+            "retriedRelationships": [],
+            "backoffMechanism": "PENALIZE_FLOWFILE",
+            "maxBackoffPeriod": "10 mins",
+            "componentType": "PROCESSOR",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          }
+        ],
+        "inputPorts": [],
+        "outputPorts": [],
+        "connections": [
+          {
+            "identifier": "2139f114-a473-3286-be33-0bfd6b7658cf",
+            "instanceIdentifier": "f9dbf0c0-01a0-1000-f838-bef9cb83dc77",
+            "name": "",
+            "source": {
+              "id": "20d46a7a-0ccb-3b9f-a085-e67138432c73",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "RabbitMQ sender: Pathfinder message",
+              "comments": "",
+              "instanceIdentifier": "f9dbef9e-01a0-1000-6eed-21a1acac9139"
+            },
+            "destination": {
+              "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "RabbitMQ sender: publish x.swim.dev.bridge.in",
+              "comments": "",
+              "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "success"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "568df513-b2e3-38a4-b403-71794cef68b4",
+            "instanceIdentifier": "f9dbf132-01a0-1000-8f8f-42249616d34c",
+            "name": "sent to RabbitMQ",
+            "source": {
+              "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "RabbitMQ sender: publish x.swim.dev.bridge.in",
+              "comments": "",
+              "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
+            },
+            "destination": {
+              "id": "7794bfe6-0b66-3ca4-bb7a-7445ddb0652d",
+              "type": "FUNNEL",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Funnel",
+              "comments": "",
+              "instanceIdentifier": "f9dbf10b-01a0-1000-7ddb-169556b41556"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "success"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "5242fbe2-3140-3252-9b27-b06f8817ce02",
+            "instanceIdentifier": "f9dbf04d-01a0-1000-af01-3ba1762ff767",
+            "name": "sent to Solace",
+            "source": {
+              "id": "0a31de6a-44d7-3ee6-9048-b2c1bd0d9d42",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Solace sender: publish t/vnm/vatm/dev/atfm/v1/fpl",
+              "comments": "",
+              "instanceIdentifier": "f9dbef47-01a0-1000-2181-7e2e5026cf05"
+            },
+            "destination": {
+              "id": "3992fc59-2eaa-311c-8c64-5d89c7c5b163",
+              "type": "FUNNEL",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Funnel",
+              "comments": "",
+              "instanceIdentifier": "f9dbf02d-01a0-1000-8fde-8b0165756242"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "success"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "c8c574db-8e60-30d1-98d2-376981fb1645",
+            "instanceIdentifier": "f9dbf00a-01a0-1000-87a2-4ed9ca2ab8a0",
+            "name": "",
+            "source": {
+              "id": "0a31de6a-44d7-3ee6-9048-b2c1bd0d9d42",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Solace sender: publish t/vnm/vatm/dev/atfm/v1/fpl",
+              "comments": "",
+              "instanceIdentifier": "f9dbef47-01a0-1000-2181-7e2e5026cf05"
+            },
+            "destination": {
+              "id": "0a31de6a-44d7-3ee6-9048-b2c1bd0d9d42",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Solace sender: publish t/vnm/vatm/dev/atfm/v1/fpl",
+              "comments": "",
+              "instanceIdentifier": "f9dbef47-01a0-1000-2181-7e2e5026cf05"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "failure"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "9ea2f9af-ae50-34d4-af69-f882547a57ae",
+            "instanceIdentifier": "f9dbf099-01a0-1000-7684-f72eea0c085d",
+            "name": "received from Solace",
+            "source": {
+              "id": "eb4b12a1-ceb7-34ec-91f3-7c1f07308dec",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Solace receiver: subscribe t/vnm/vatm/dev/ext/>",
+              "comments": "",
+              "instanceIdentifier": "f9dbef74-01a0-1000-796b-dede36101d7f"
+            },
+            "destination": {
+              "id": "bad89418-e360-3541-a1cd-ea9049d03e16",
+              "type": "FUNNEL",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Funnel",
+              "comments": "",
+              "instanceIdentifier": "f9dbf076-01a0-1000-742c-ac0c12d72d0f"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "success"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "fda3878a-5167-32dd-b580-3375623a2c04",
+            "instanceIdentifier": "f9dbf0e5-01a0-1000-bae5-902dcaa50df5",
+            "name": "",
+            "source": {
+              "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "RabbitMQ sender: publish x.swim.dev.bridge.in",
+              "comments": "",
+              "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
+            },
+            "destination": {
+              "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "RabbitMQ sender: publish x.swim.dev.bridge.in",
+              "comments": "",
+              "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "failure"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "be7e708b-2f7b-365f-a22f-603108be2b11",
+            "instanceIdentifier": "f9dbefe3-01a0-1000-110e-5b999bc7017b",
+            "name": "",
+            "source": {
+              "id": "0067fc02-7504-3c18-a4f4-427a3144f33c",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Solace sender: Pathfinder message",
+              "comments": "",
+              "instanceIdentifier": "f9dbef15-01a0-1000-ff92-5cdf8c4fc546"
+            },
+            "destination": {
+              "id": "0a31de6a-44d7-3ee6-9048-b2c1bd0d9d42",
+              "type": "PROCESSOR",
+              "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
+              "name": "Solace sender: publish t/vnm/vatm/dev/atfm/v1/fpl",
+              "comments": "",
+              "instanceIdentifier": "f9dbef47-01a0-1000-2181-7e2e5026cf05"
+            },
+            "labelIndex": 1,
+            "zIndex": 0,
+            "selectedRelationships": [
+              "success"
+            ],
+            "backPressureObjectThreshold": 10000,
+            "backPressureDataSizeThreshold": "1 GB",
+            "flowFileExpiration": "0 sec",
+            "prioritizers": [],
+            "bends": [],
+            "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+            "loadBalanceCompression": "DO_NOT_COMPRESS",
+            "componentType": "CONNECTION",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          }
+        ],
+        "labels": [],
+        "funnels": [
+          {
+            "identifier": "7794bfe6-0b66-3ca4-bb7a-7445ddb0652d",
+            "instanceIdentifier": "f9dbf10b-01a0-1000-7ddb-169556b41556",
+            "position": {
+              "x": 1150.0,
+              "y": 500.0
+            },
+            "componentType": "FUNNEL",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "3992fc59-2eaa-311c-8c64-5d89c7c5b163",
+            "instanceIdentifier": "f9dbf02d-01a0-1000-8fde-8b0165756242",
+            "position": {
+              "x": 150.0,
+              "y": 500.0
+            },
+            "componentType": "FUNNEL",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          },
+          {
+            "identifier": "bad89418-e360-3541-a1cd-ea9049d03e16",
+            "instanceIdentifier": "f9dbf076-01a0-1000-742c-ac0c12d72d0f",
+            "position": {
+              "x": 650.0,
+              "y": 250.0
+            },
+            "componentType": "FUNNEL",
+            "groupIdentifier": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099"
+          }
+        ],
+        "controllerServices": [],
+        "parameterContextName": "bridge",
+        "defaultFlowFileExpiration": "0 sec",
+        "defaultBackPressureObjectThreshold": 10000,
+        "defaultBackPressureDataSizeThreshold": "1 GB",
+        "scheduledState": "ENABLED",
+        "executionEngine": "INHERITED",
+        "maxConcurrentTasks": 1,
+        "statelessFlowTimeout": "1 min",
+        "flowFileConcurrency": "UNBOUNDED",
+        "flowFileOutboundPolicy": "STREAM_WHEN_AVAILABLE",
+        "componentType": "PROCESS_GROUP",
+        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
+      }
+    ],
     "remoteProcessGroups": [],
     "processors": [
       {
