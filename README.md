@@ -121,7 +121,8 @@ flowchart LR
   end
   subgraph Inbound
     Q["Queue q/vnm/vatm/dev/bridge/in"] --> C2["ConsumeAMQP"]
-    C2 --> U2["UpdateAttribute<br/>RabbitMQ properties to JMS"]
+    C2 --> G["ExecuteGroovyScript<br/>RabbitMQ headers to JMS properties"]
+    G --> U2["UpdateAttribute<br/>RabbitMQ properties to JMS"]
     U2 --> R["RouteOnAttribute<br/>một nhánh cho mỗi Bridge Rule"]
     R -- ext --> U3["UpdateAttribute<br/>ext/ to t/vnm/vatm/dev/ext/"]
     U3 --> P2["PublishJMS<br/>Solace topic"]
@@ -145,8 +146,8 @@ Mở RabbitMQ UI `http://192.168.121.61:15672` (đăng nhập bằng tài khoả
 ### Inbound
 
 1. Trong Solace Try-Me, subscribe `t/vnm/vatm/dev/ext/>`.
-2. Trong RabbitMQ UI, mở exchange `x.swim.dev.bridge.in` và publish một message với Routing key `ext/met/metar`.
-3. Try-Me hiện message đó trên topic `t/vnm/vatm/dev/ext/met/metar`.
+2. Trong RabbitMQ UI, mở exchange `x.swim.dev.bridge.in` và publish một message với Routing key `ext/met/metar`. Thêm một header, ví dụ `source` = `sgp`.
+3. Try-Me hiện message đó trên topic `t/vnm/vatm/dev/ext/met/metar`, có JMS property `source` = `sgp`.
 
 ### Dead letter
 
@@ -161,7 +162,7 @@ Xoá queue demo `q/vnm/vatm/dev/bridgedemo/userb` trong RabbitMQ UI.
 
 - Nội dung message giữ nguyên.
 - Outbound: thuộc tính JMS `contentType`, JMS message id, JMS correlation id và JMS delivery mode (persistent hay không) trở thành `content_type`, `message_id`, `correlation_id` và `delivery_mode` trên RabbitMQ. Các JMS property khác do người gửi đặt (ví dụ `priority=high`) trở thành header trên RabbitMQ.
-- Inbound: `content_type`, `message_id` và `correlation_id` trên RabbitMQ trở thành JMS property `contentType`, `messageId` và JMS correlation id trên Solace. Message tới Solace luôn là TextMessage (UTF-8), vì SWIM payload là XML hoặc JSON. Header của RabbitMQ **không** được chuyển sang Solace.
+- Inbound: `content_type`, `message_id` và `correlation_id` trên RabbitMQ trở thành JMS property `contentType`, `messageId` và JMS correlation id trên Solace. Mỗi header của RabbitMQ trở thành một JMS property cùng tên trên Solace (ví dụ header `x-trace-id` = `abc-1` thành property `x-trace-id` = `abc-1`). Giá trị luôn được gửi dạng chuỗi, nên header số `5` thành chuỗi `"5"`. Header có tên `uuid`, `filename`, `path`, `topic`, `contentType`, `messageId` hoặc bắt đầu bằng `jms_` không được chuyển, vì NiFi dùng các tên này cho việc riêng. Message tới Solace luôn là TextMessage (UTF-8), vì SWIM payload là XML hoặc JSON.
 - Dead letter: message giữ nguyên nội dung, các thuộc tính và header.
 
 ## Thêm Bridge Rule

@@ -37,7 +37,7 @@
           "Prefetch Count": "0",
           "Header Separator": ",",
           "AMQP Version": "0.9.1",
-          "Header Output Format": "Comma-Separated String",
+          "Header Output Format": "FlowFile Attributes",
           "Virtual Host": "#{rabbitmq.vhost}",
           "Username": "#{rabbitmq.username}",
           "Client Certificate Authentication Enabled": "false",
@@ -199,7 +199,7 @@
         "comments": "",
         "position": {
           "x": 800.0,
-          "y": 600.0
+          "y": 800.0
         },
         "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
         "bundle": {
@@ -437,6 +437,81 @@
         "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
       },
       {
+        "identifier": "19a19596-c914-3f0d-85ca-6aa13755ec26",
+        "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b",
+        "name": "RabbitMQ headers -> JMS properties",
+        "comments": "",
+        "position": {
+          "x": 800.0,
+          "y": 200.0
+        },
+        "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-groovyx-nar",
+          "version": "2.12.0"
+        },
+        "properties": {
+          "Script File": null,
+          "Additional Classpath": null,
+          "Script Body": "// RabbitMQ header \"consume.amqp.<name>\" -> attribute \"<name>\", so it reaches Solace as JMS property <name>\ndef flowFile = session.get()\nif (!flowFile) return\ndef prefix = 'consume.amqp.'\ndef headers = flowFile.getAttributes().findAll { it.key.startsWith(prefix) }\nflowFile = session.putAllAttributes(flowFile, headers.collectEntries { [it.key.substring(prefix.length()), it.value] })\nflowFile = session.removeAllAttributes(flowFile, headers.keySet())\nsession.transfer(flowFile, REL_SUCCESS)\n",
+          "Failure Strategy": "rollback"
+        },
+        "propertyDescriptors": {
+          "Script File": {
+            "name": "Script File",
+            "displayName": "Script File",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": false,
+            "resourceDefinition": {
+              "cardinality": "SINGLE",
+              "resourceTypes": [
+                "FILE"
+              ]
+            }
+          },
+          "Additional Classpath": {
+            "name": "Additional Classpath",
+            "displayName": "Additional Classpath",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": false
+          },
+          "Script Body": {
+            "name": "Script Body",
+            "displayName": "Script Body",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": false
+          },
+          "Failure Strategy": {
+            "name": "Failure Strategy",
+            "displayName": "Failure Strategy",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": false
+          }
+        },
+        "style": {},
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "componentType": "PROCESSOR",
+        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
+      },
+      {
         "identifier": "3d1acdb3-874f-32e9-82c0-a28f7212ee39",
         "instanceIdentifier": "4258a3a0-7e4c-330f-cfbf-c1bc8147ca72",
         "name": "out atfm: consume t/vnm/vatm/dev/atfm/>",
@@ -518,9 +593,9 @@
             "resourceDefinition": {
               "cardinality": "MULTIPLE",
               "resourceTypes": [
-                "FILE",
                 "DIRECTORY",
-                "URL"
+                "URL",
+                "FILE"
               ]
             }
           },
@@ -659,9 +734,9 @@
             "resourceDefinition": {
               "cardinality": "MULTIPLE",
               "resourceTypes": [
-                "FILE",
                 "DIRECTORY",
-                "URL"
+                "URL",
+                "FILE"
               ]
             }
           },
@@ -719,7 +794,7 @@
         "comments": "",
         "position": {
           "x": 800.0,
-          "y": 200.0
+          "y": 400.0
         },
         "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
         "bundle": {
@@ -812,7 +887,7 @@
         "comments": "",
         "position": {
           "x": 1300.0,
-          "y": 600.0
+          "y": 800.0
         },
         "type": "org.apache.nifi.amqp.processors.PublishAMQP",
         "bundle": {
@@ -827,7 +902,7 @@
           "Maximum Input FlowFile Size": "128 MB",
           "Brokers": null,
           "Host Name": "#{rabbitmq.host}",
-          "Headers Pattern": "",
+          "Headers Pattern": "(?!(uuid|filename|path|contentType|messageId|jms_correlationId|RouteOnAttribute\\.Route)$|amqp\\$).*",
           "SSL Context Service": null,
           "Delivery Guarantee": "AT_LEAST_ONCE",
           "Header Separator": ",",
@@ -835,7 +910,7 @@
           "Virtual Host": "#{rabbitmq.vhost}",
           "Username": "#{rabbitmq.username}",
           "Client Certificate Authentication Enabled": "false",
-          "Headers Source": "AMQP_HEADERS_ATTRIBUTE",
+          "Headers Source": "FLOWFILE_ATTRIBUTES",
           "Password": "#{rabbitmq.password}"
         },
         "propertyDescriptors": {
@@ -979,7 +1054,7 @@
         "comments": "",
         "position": {
           "x": 800.0,
-          "y": 800.0
+          "y": 1000.0
         },
         "type": "org.apache.nifi.jms.processors.PublishJMS",
         "bundle": {
@@ -993,7 +1068,7 @@
           "User Name": "#{solace.username}",
           "JNDI Initial Context Factory Class": null,
           "Message Body Type": "text",
-          "Allow Illegal Characters in Header Names": "false",
+          "Allow Illegal Characters in Header Names": "true",
           "Destination Name": "${topic}",
           "JMS Connection Factory Implementation Class": null,
           "Record Reader": null,
@@ -1091,9 +1166,9 @@
             "resourceDefinition": {
               "cardinality": "MULTIPLE",
               "resourceTypes": [
-                "FILE",
                 "DIRECTORY",
-                "URL"
+                "URL",
+                "FILE"
               ]
             }
           },
@@ -1127,9 +1202,9 @@
             "resourceDefinition": {
               "cardinality": "MULTIPLE",
               "resourceTypes": [
-                "FILE",
                 "DIRECTORY",
-                "URL"
+                "URL",
+                "FILE"
               ]
             }
           },
@@ -1326,7 +1401,7 @@
         "comments": "",
         "position": {
           "x": 800.0,
-          "y": 400.0
+          "y": 600.0
         },
         "type": "org.apache.nifi.processors.standard.RouteOnAttribute",
         "bundle": {
@@ -1377,6 +1452,74 @@
     "outputPorts": [],
     "connections": [
       {
+        "identifier": "9e568b0c-9371-34ce-8f3a-fe3f873f77ec",
+        "instanceIdentifier": "f85f33e5-01a0-1000-6c90-7c3a42756f83",
+        "source": {
+          "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
+          "type": "PROCESSOR",
+          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
+          "name": "RabbitMQ headers -> JMS properties",
+          "comments": "",
+          "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
+        },
+        "destination": {
+          "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
+          "type": "PROCESSOR",
+          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
+          "name": "RabbitMQ headers -> JMS properties",
+          "comments": "",
+          "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
+        },
+        "labelIndex": 1,
+        "zIndex": 0,
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "loadBalanceCompression": "DO_NOT_COMPRESS",
+        "componentType": "CONNECTION",
+        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
+      },
+      {
+        "identifier": "393faec0-0a94-3fe7-8120-5f9e6d685cb1",
+        "instanceIdentifier": "f85f33bf-01a0-1000-4026-1ba5158fdda2",
+        "source": {
+          "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
+          "type": "PROCESSOR",
+          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
+          "name": "RabbitMQ headers -> JMS properties",
+          "comments": "",
+          "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
+        },
+        "destination": {
+          "id": "8c9db5d3-a279-37dc-a546-c2acf2caa370",
+          "type": "PROCESSOR",
+          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
+          "name": "RabbitMQ properties -> JMS properties",
+          "comments": "",
+          "instanceIdentifier": "37e59fb1-9216-3093-7736-6a88f6815b05"
+        },
+        "labelIndex": 1,
+        "zIndex": 0,
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "loadBalanceCompression": "DO_NOT_COMPRESS",
+        "componentType": "CONNECTION",
+        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
+      },
+      {
         "identifier": "2e973dd1-3c32-34fd-9e4f-49a249480928",
         "instanceIdentifier": "922d16cc-82cf-34fd-ed6d-f3d9a39b0602",
         "source": {
@@ -1422,12 +1565,12 @@
           "instanceIdentifier": "4603b6a6-0a67-39ab-2c82-62a2007e23f2"
         },
         "destination": {
-          "id": "8c9db5d3-a279-37dc-a546-c2acf2caa370",
+          "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "RabbitMQ properties -> JMS properties",
+          "name": "RabbitMQ headers -> JMS properties",
           "comments": "",
-          "instanceIdentifier": "37e59fb1-9216-3093-7736-6a88f6815b05"
+          "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
         },
         "labelIndex": 1,
         "zIndex": 0,
@@ -1772,9 +1915,9 @@
             "resourceDefinition": {
               "cardinality": "MULTIPLE",
               "resourceTypes": [
-                "FILE",
                 "DIRECTORY",
-                "URL"
+                "URL",
+                "FILE"
               ]
             }
           },
@@ -1870,15 +2013,15 @@
           "provided": false
         },
         {
+          "name": "rabbitmq.password",
+          "sensitive": true,
+          "provided": false
+        },
+        {
           "name": "rabbitmq.host",
           "sensitive": false,
           "provided": false,
           "value": "192.168.121.61"
-        },
-        {
-          "name": "rabbitmq.password",
-          "sensitive": true,
-          "provided": false
         },
         {
           "name": "rabbitmq.username",

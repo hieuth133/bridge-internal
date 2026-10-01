@@ -14,4 +14,4 @@ What this costs us:
 - The flow is JSON edited in a UI, not code. There are no automated tests. We check the Bridge with the demo in the README.
 - A message leaves the Internal EMS (or the External EMS) once it is safely stored in NiFi's repositories, not once the other broker accepted it. NiFi then retries until the other broker accepts it. The NiFi volumes must therefore be kept.
 - There is no loop guard. A loop needs an Inbound target that an Outbound source also matches. Keep the two sides' topics apart when adding Bridge Rules.
-- RabbitMQ headers are not copied to Solace, because NiFi always gives them a name prefix with `.`, which a JMS property name cannot contain. Content type, message id and correlation id are copied.
+- The flow holds one small Groovy script (`ExecuteGroovyScript`, built into the image). `ConsumeAMQP` always puts a name prefix (`consume.amqp.`) on RabbitMQ headers and no built-in processor can rename attributes by pattern, so the script strips the prefix. Without it, RabbitMQ headers could not reach Solace under their own names, which the tests need. Header values reach Solace as strings.
