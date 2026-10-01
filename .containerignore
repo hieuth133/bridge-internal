@@ -1,0 +1,7 @@
+target
+.git
+docs
+.claude
+.agents
+.gemini
+.codegraph
