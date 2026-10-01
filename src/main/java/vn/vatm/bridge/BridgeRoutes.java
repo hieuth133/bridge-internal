@@ -15,11 +15,15 @@ public class BridgeRoutes extends RouteBuilder {
     public void configure() throws Exception {
         List<BridgeRule> rules = BridgeRule.parse(getContext().resolvePropertyPlaceholders("{{bridge.rules}}"));
 
+        errorHandler(defaultErrorHandler().maximumRedeliveries(-1).redeliveryDelay(1000)
+                .allowRedeliveryWhileStopping(false));
+
         CachingConnectionFactory cf = new CachingConnectionFactory(
                 prop("rabbitmq.host"), Integer.parseInt(prop("rabbitmq.port")));
         cf.setVirtualHost(prop("rabbitmq.vhost"));
         cf.setUsername(prop("rabbitmq.username"));
         cf.setPassword(prop("rabbitmq.password"));
+        cf.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
 
         RabbitAdmin admin = new RabbitAdmin(cf);
         admin.declareExchange(new TopicExchange(prop("bridge.out.exchange")));
@@ -45,12 +49,21 @@ public class BridgeRoutes extends RouteBuilder {
         jmsCf.setCacheConsumers(false);
         getContext().addComponent("jms", org.apache.camel.component.jms.JmsComponent.jmsComponent(jmsCf));
 
+        // Services are stopped after the routes, so the connections close only once no exchange is in flight.
+        getContext().addService(new org.apache.camel.support.service.ServiceSupport() {
+            @Override
+            protected void doStop() {
+                cf.destroy();
+                jmsCf.destroy();
+            }
+        });
+
         for (BridgeRule r : rules) {
             if (r.direction() != BridgeRule.Direction.OUT) {
                 continue;
             }
             from("jms:topic:" + r.source() + ">?subscriptionDurable=true&durableSubscriptionName={{bridge.out.durable-prefix}}"
-                    + r.name() + "&disableReplyTo=true")
+                    + r.name() + "&disableReplyTo=true&acknowledgementModeName=CLIENT_ACKNOWLEDGE")
                     .routeId("out-" + r.name())
                     .filter(header("bridgeOrigin").isNull())
                     .process(e -> e.getMessage().setHeader("CamelSpringRabbitmqRoutingOverrideKey",
@@ -63,7 +76,7 @@ public class BridgeRoutes extends RouteBuilder {
                     .to("spring-rabbitmq:{{bridge.out.exchange}}");
         }
 
-        from("spring-rabbitmq:{{bridge.in.exchange}}?queues={{bridge.in.queue}}&autoDeclare=false&disableReplyTo=true")
+        from("spring-rabbitmq:{{bridge.in.exchange}}?queues={{bridge.in.queue}}&autoDeclare=false&disableReplyTo=true&rejectAndDontRequeue=false")
                 .routeId("in")
                 .filter(header("bridgeOrigin").isNull())
                 .process(e -> {

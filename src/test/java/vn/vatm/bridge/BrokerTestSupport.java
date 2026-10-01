@@ -123,6 +123,20 @@ public abstract class BrokerTestSupport {
         return session.createConsumer(session.createTopic(topicWithWildcard));
     }
 
+    void deleteExchange(String exchange) throws Exception {
+        requireTestName(exchange);
+        try (Channel ch = rabbit().createChannel()) {
+            ch.exchangeDelete(exchange);
+        }
+    }
+
+    void declareTopicExchange(String exchange) throws Exception {
+        requireTestName(exchange);
+        try (Channel ch = rabbit().createChannel()) {
+            ch.exchangeDeclare(exchange, "topic", true);
+        }
+    }
+
     void bindTestQueue(String exchange, String key) throws Exception {
         requireTestName(exchange);
         requireTestName(TEST_QUEUE);
