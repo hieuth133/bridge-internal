@@ -15,7 +15,23 @@ public record BridgeRule(Direction direction, String name, String source, String
                 continue;
             }
             String[] t = e.split("\\s+");
-            rules.add(new BridgeRule(Direction.valueOf(t[0].toUpperCase()), t[1], t[2], t[3]));
+            String dir = t[0].toUpperCase(java.util.Locale.ROOT);
+            if (t.length != 4 || !(dir.equals("IN") || dir.equals("OUT"))) {
+                throw new IllegalArgumentException("Bad Bridge Rule: '" + e + "'");
+            }
+            BridgeRule b = new BridgeRule(Direction.valueOf(dir), t[1], t[2], t[3]);
+            if (b.direction == Direction.OUT && !b.source.endsWith("/")) {
+                throw new IllegalArgumentException(
+                        "Outbound Bridge Rule " + b.name + ": source prefix must end with '/'");
+            }
+            for (BridgeRule a : rules) {
+                if (a.direction == b.direction
+                        && (a.source.startsWith(b.source) || b.source.startsWith(a.source))) {
+                    throw new IllegalArgumentException("Bridge Rules " + a.name() + " and " + b.name()
+                            + " overlap (" + a.direction() + "): " + a.source() + " and " + b.source());
+                }
+            }
+            rules.add(b);
         }
         return rules;
     }

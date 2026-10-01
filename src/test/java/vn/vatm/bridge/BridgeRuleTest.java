@@ -1,7 +1,9 @@
 package vn.vatm.bridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -36,5 +38,37 @@ class BridgeRuleTest {
     void blankTextGivesNoRules() {
         assertTrue(BridgeRule.parse("").isEmpty());
         assertTrue(BridgeRule.parse("  ").isEmpty());
+    }
+
+    private static void assertRefused(String text, String message) {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> BridgeRule.parse(text));
+        assertEquals(message, ex.getMessage());
+    }
+
+    @Test
+    void refusesOverlappingRulesInSameDirection() {
+        assertRefused("in ext ext/ t/vnm/vatm/dev/ext/, in extmet ext/met/ t/vnm/vatm/dev/extmet/",
+                "Bridge Rules ext and extmet overlap (IN): ext/ and ext/met/");
+    }
+
+    @Test
+    void allowsSamePrefixInDifferentDirections() {
+        assertDoesNotThrow(() -> BridgeRule.parse("out a t/x/ t/x/, in b t/x/ t/y/"));
+    }
+
+    @Test
+    void refusesEntryWithWrongTokenCount() {
+        assertRefused("out atfm t/vnm/", "Bad Bridge Rule: 'out atfm t/vnm/'");
+    }
+
+    @Test
+    void refusesUnknownDirection() {
+        assertRefused("sideways a b/ c/", "Bad Bridge Rule: 'sideways a b/ c/'");
+    }
+
+    @Test
+    void refusesOutboundSourceWithoutTrailingSlash() {
+        assertRefused("out atfm t/vnm/vatm/dev/atfm t/x/",
+                "Outbound Bridge Rule atfm: source prefix must end with '/'");
     }
 }
