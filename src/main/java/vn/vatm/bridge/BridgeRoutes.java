@@ -1,5 +1,6 @@
 package vn.vatm.bridge;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.springrabbit.SpringRabbitMQComponent;
@@ -78,6 +79,17 @@ public class BridgeRoutes extends RouteBuilder {
                         .to("spring-rabbitmq:default?routingKey={{bridge.in.dlq}}")
                     .otherwise()
                         .removeHeader("bridgeRoutingKey")
+                        .setHeader("JMSCorrelationID", header("CamelSpringRabbitmqCorrelationId"))
+                        .setHeader("contentType", header("CamelSpringRabbitmqContentType"))
+                        .setHeader("messageId", header("CamelSpringRabbitmqMessageId"))
+                        .process(e -> {
+                            String ct = e.getMessage().getHeader("contentType", String.class);
+                            Object b = e.getMessage().getBody();
+                            if (ct != null && b instanceof byte[] bytes
+                                    && (ct.startsWith("application/json") || ct.startsWith("application/xml"))) {
+                                e.getMessage().setBody(new String(bytes, StandardCharsets.UTF_8));
+                            }
+                        })
                         .setHeader("bridgeOrigin", constant("rabbitmq"))
                         .to("jms:topic:bridge-inbound")
                 .end();
