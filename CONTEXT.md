@@ -52,5 +52,8 @@ _Avoid:_ connector, relay, shovel
 **Bridge Rule** — One mapping the Bridge follows: a direction, a source prefix, and a target prefix. The part of the name after the source prefix is kept as it is. When the two prefixes are equal, the name is the same on both brokers.
 _Avoid:_ route, mapping entry
 
+**Dead letter queue** — The queue on the External EMS where the Bridge puts an Inbound message that no Bridge Rule matches.
+_Avoid:_ DLQ (in prose), error queue
+
 **Durable Topic Endpoint** — A place on the Internal EMS that keeps the messages of one topic subscription while the Bridge is away. Each Outbound Bridge Rule has one.
 _Avoid:_ DTE (in prose), durable subscriber
