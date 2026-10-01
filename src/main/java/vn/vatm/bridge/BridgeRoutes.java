@@ -54,6 +54,9 @@ public class BridgeRoutes extends RouteBuilder {
                     .filter(header("bridgeOrigin").isNull())
                     .process(e -> e.getMessage().setHeader("CamelSpringRabbitmqRoutingOverrideKey",
                             r.map(e.getMessage().getHeader("JMSDestination", jakarta.jms.Topic.class).getTopicName())))
+                    .setHeader("CamelSpringRabbitmqMessageId", header("JMSMessageID"))
+                    .setHeader("CamelSpringRabbitmqCorrelationId", header("JMSCorrelationID"))
+                    .setHeader("CamelSpringRabbitmqContentType", header("contentType"))
                     .removeHeaders("JMS*")
                     .setHeader("bridgeOrigin", constant("solace"))
                     .to("spring-rabbitmq:{{bridge.out.exchange}}");
