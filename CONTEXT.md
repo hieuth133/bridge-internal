@@ -45,12 +45,23 @@ _Avoid:_ connector, relay, shovel
 
 **Inbound** — The direction from the External EMS to the Internal EMS.
 
-**SWIM topic** — A topic name that follows the SWIM naming convention, `t/<country>/<organisation>/<environment>/<system>/<version>/...`, with `/` between levels.
+**SWIM topic** — A topic name that follows the SWIM naming convention, with `/` between levels. A Pub/Sub topic starts `t/<country>/<organisation>/<environment>/<system>/<version>/...`. A Request/Reply topic names the sender and the receiver, `tr/<country>/<organisation>/<country>/<organisation>/<environment>/...`.
 
-**Routing key** — The name a message carries on the External EMS. It is the same string as a SWIM topic, `/` included (see ADR 0002).
+**Routing key** — The name a message carries on the External EMS: the SWIM topic with `.` in place of `/` (see ADR 0005).
 
-**Bridge Rule** — One mapping the Bridge follows: a direction, a source prefix, and a target prefix. The part of the name after the source prefix is kept as it is. When the two prefixes are equal, the name is the same on both brokers.
-_Avoid:_ route, mapping entry
+**Router** — The step on the External EMS that every message passes through, in both directions. It checks the mandatory APAC headers, stamps `APAC_TIMESTAMP`, and sends a Pub/Sub message on by its Routing key and a Request/Reply message to each of its Recipient codes.
+_Avoid:_ Bridge Rule, dispatcher
 
-**Durable Topic Endpoint** — A place on the Internal EMS that keeps the messages of one topic subscription while the Bridge is away. Each Outbound Bridge Rule has one.
-_Avoid:_ DTE (in prose), durable subscriber
+**Recipient code** — One entry of the `APAC_RECIPIENT_LIST` header, `<ICAO prefix>_<organisation>`, for example `VV_VATM`, `VV_HVN`, `WS_CAAS`. Codes that start `VV_` are inside Viet Nam; every other code is reached through GEMS.
+
+**Route header** — The header `VV_ROUTE` that the Router puts on each copy of a Request/Reply message: one value per copy, the Recipient code, or `GEMS` for recipients outside Viet Nam.
+_Avoid:_ routing header, destination header
+
+**Topic routing** — Delivering a message by its SWIM topic or Routing key alone: Solace subscriptions and RabbitMQ topic bindings. Used for Pub/Sub.
+
+**Header routing** — Delivering a message by its headers: on RabbitMQ a headers binding on the Route header and `APAC_CATEGORY`, on Solace a selector on `APAC_RECIPIENT_LIST`. Used for Request/Reply.
+
+**GEMS mode** — How the Router hands Request/Reply messages for recipients outside Viet Nam to GEMS: `header` sends one copy for all of them, `topic` sends one copy per recipient with that recipient in the Routing key.
+
+**Dead letter queue** — The queue on the External EMS where the Router puts a message it cannot route, with the reason in the header `VV_DLX_REASON`.
+_Avoid:_ DLQ (in prose), error queue

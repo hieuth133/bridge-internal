@@ -1,5 +1,7 @@
 # The Bridge is Java 21 with Apache Camel Main 4.22 LTS, built with the Maven Wrapper
 
+Superseded by ADR 0004: the Bridge is now an Apache NiFi flow.
+
 The project had no code yet. The user wants Apache Camel in Java, with as little code as possible. Java 21 is installed on the machine. Maven is not.
 
 We use:
