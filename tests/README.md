@@ -1,0 +1,188 @@
+# Manual Bridge tests
+
+These scripts let a tester check, by hand, that the Bridge carries a message from one broker to the other **without changing it**. Each script sends one message and checks it on the other side.
+
+The only change the Bridge may make is to remove the header `VV_ROUTE`, which only exists inside RabbitMQ, so it never reaches Solace. Everything else must arrive exactly as sent: the topic or routing key, every header, correlation-id, content-type, message-id, reply-to and every byte of the payload.
+
+## The files
+
+| File | What it is |
+|---|---|
+| `env.sh` | **Script 1. Setup.** Load it with `source` (do not run it with `bash`). It sets the broker addresses and user names, asks for the passwords, downloads the jars if they are missing, and checks that it can log in to Solace and RabbitMQ. |
+| `2-pubsub-solace-to-rabbitmq.sh` | **Script 2. Pub/Sub, Solace → RabbitMQ.** Run it on the Solace machine. |
+| `3-rr-solace-to-rabbitmq.sh` | **Script 3. Async Request/Reply, Solace → RabbitMQ.** Run it on the Solace machine. |
+| `4-pubsub-rabbitmq-to-solace.sh` | **Script 4. Pub/Sub, RabbitMQ → Solace.** Run it on the RabbitMQ machine. |
+| `5-rr-rabbitmq-to-solace.sh` | **Script 5. Async Request/Reply, RabbitMQ → Solace.** Run it on the RabbitMQ machine. |
+| `BridgeTest.java` | The program that scripts 2–5 call to send and check. Java runs it straight from the source file; there is nothing to build. |
+| `jars.txt` | Download link for `jakarta.jms-api`, the one jar the program needs besides the Solace jars. |
+| `lib/` | Created by `env.sh`. It holds the downloaded `jakarta.jms-api` jar. Git ignores it. |
+
+The Solace jars themselves are listed in `../nifi/solace-jars.txt` and go into `../lib/`, the same folder NiFi uses. `jakarta.jms-api` is kept apart in `tests/lib/`: NiFi already has its own copy, and a second copy in NiFi's folder could clash with it.
+
+## What each script sends
+
+| Script | Sends | Must arrive at |
+|---|---|---|
+| 2 | Solace topic `t/vnm/vatm/dev/atfm/v1/fpl` | RabbitMQ exchange `x/vnm/vatm/dev/ingress`, routing key `t.vnm.vatm.dev.atfm.v1.fpl` |
+| 3 | Solace topic `tr/vnm/vatm/vnm/vna/dev/fpms/v1/filing/reply`, `APAC_RECIPIENT_LIST` = `VV_VATM,VV_HVN,WS_CAAS`, reply-to = queue `q/vnm/vatm/dev/fpms/reply` | RabbitMQ `x/vnm/vatm/dev/ingress`, with `reply_to` = `q/vnm/vatm/dev/fpms/reply` |
+| 4 | RabbitMQ exchange `x/vnm/vatm/dev/swim`, key `t.vnm.acv.dev.aodb.v1.departure.publish.vvts`, `APAC_RECIPIENT_LIST` = `VV_VATM, WS_CAAS` (the space is there on purpose: the Bridge must not remove it) | Solace topic `t/vnm/acv/dev/aodb/v1/departure/publish/vvts` |
+| 5 | RabbitMQ exchange `x/vnm/vatm/dev/route` with `VV_ROUTE` = `VV_VATM`, key `tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request`, `APAC_RECIPIENT_LIST` = `VV_VATM,WS_CAAS`, reply-to `q/vnm/vna/dev/swim/reply` | Solace topic `tr/vnm/vna/vnm/vatm/dev/swim/v1/filing/request`, received through VATM's selector, with the full list `VV_VATM,WS_CAAS` and no `VV_ROUTE` |
+
+The message is the same one `../nifi/check-headers.py` sends: the 14 Pathfinder headers and a FIXM XML payload of about 19 KB (Vietnamese text, `→`, `&amp;`, quotes, tabs).
+
+Scripts 4 and 5 put the message straight on `swim`/`route`, the way the Router would. The Router is a separate application and is not running yet.
+
+Request/Reply is checked one way only: the request must reach the other side with its reply-to and correlation-id unchanged. Sending the reply is the receiver's job, not the Bridge's.
+
+## What you need
+
+On each machine:
+- Java 11 or newer (`java -version`);
+- `curl`;
+- a copy of this repository.
+
+The two machines must also be able to reach each other:
+- the Solace machine must reach RabbitMQ management, port `15672`;
+- the RabbitMQ machine must reach Solace, port `55555`.
+
+The Bridge must be running.
+
+## How to run
+
+### 1. Setup, on each machine
+
+From the repository folder:
+
+```
+source tests/env.sh
+```
+
+It asks for the two passwords. They stay in this shell only and are never written to a file.
+
+A good result looks like this:
+
+```
+OK   java 21.0.12.1
+OK   jars in lib/ and tests/lib/
+OK   Solace tcp://localhost:55555 VPN default as hieu
+OK   RabbitMQ http://192.168.121.61:15672/api vhost swim_sg as hieu
+
+PASS
+```
+
+If a login fails, both passwords are cleared, so the next `source tests/env.sh` asks for them again.
+
+**Settings and defaults.** To change one, `export` it **before** `source tests/env.sh`:
+
+| Variable | Default |
+|---|---|
+| `SOLACE_HOST` | `tcp://localhost:55555` |
+| `SOLACE_VPN` | `default` |
+| `SOLACE_USERNAME` | `hieu` |
+| `RABBITMQ_HOST` | `192.168.121.61` |
+| `RABBITMQ_MANAGEMENT_PORT` | `15672` |
+| `RABBITMQ_VHOST` | `swim_sg` |
+| `RABBITMQ_USERNAME` | `hieu` |
+
+On the RabbitMQ machine, Solace is not on `localhost`, so set where it is first. For example:
+
+```
+export SOLACE_HOST=tcp://solace.tailfac6af.ts.net:55555
+source tests/env.sh
+```
+
+Do not type `export SOLACE_PASSWORD=...` yourself, because the password would then stay in your shell history. Let the script ask.
+
+### 2. The tests
+
+On the Solace machine:
+
+```
+tests/2-pubsub-solace-to-rabbitmq.sh
+tests/3-rr-solace-to-rabbitmq.sh
+```
+
+On the RabbitMQ machine:
+
+```
+tests/4-pubsub-rabbitmq-to-solace.sh
+tests/5-rr-rabbitmq-to-solace.sh
+```
+
+Each script waits up to 30 seconds for its message on the other broker, then prints one line per check. Below is the shape of the output, with some lines cut:
+
+```
+Sent to RabbitMQ x/vnm/vatm/dev/route key tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request with VV_ROUTE=VV_VATM, correlation-id bridge-test-1791007955728. Waiting for it on Solace topic tr/vnm/vna/vnm/vatm/dev/swim/v1/filing/request ...
+
+Arrived on Solace (VATM selector matched)
+  OK   topic                       'topic tr/vnm/vna/vnm/vatm/dev/swim/v1/filing/request'
+  OK   APAC_SOURCE                 'VV_HVN'
+  OK   APAC_RECIPIENT_LIST         'VV_VATM,WS_CAAS'
+  ...
+  OK   VV_ROUTE                    absent
+  OK   correlation-id              'bridge-test-1791007955728'
+  OK   reply-to                    'queue q/vnm/vna/dev/swim/reply'
+  OK   payload                     19087 bytes, sha256 0c8bf313da9964aa
+
+PASS
+```
+
+A wrong value is printed as `FAIL`, followed by the value that was expected.
+
+### What the result means
+
+| Last line | Exit code | Meaning |
+|---|---|---|
+| `PASS` | 0 | The message arrived and nothing was changed. |
+| `FAIL: N check(s) failed` | 1 | The message arrived, but N values differ. Each one is marked `FAIL`. |
+| `FAIL nothing arrived ...` | 1 | Nothing arrived within 30 seconds. The line says what to check: whether the Bridge is running, whether the topic or key reaches the Bridge's queue, and whether VATM is in the list. |
+| `FAIL Solace: ...`, `FAIL RabbitMQ ...`, `... is not set` | 2 | The test could not run: a wrong password, a broker that cannot be reached, or a missing `source tests/env.sh`. |
+
+## Options
+
+| Option | Scripts | What it does |
+|---|---|---|
+| `--recipients LIST` | 2–5 | Send this `APAC_RECIPIENT_LIST` instead of the default. |
+| `--payload FILE` | 2–5 | Send this UTF-8 file instead of the sample FIXM message. |
+| `--topic TOPIC` | 2, 3 | Send to this Solace topic. It must be in the subscriptions of Solace queue `q/vnm/vatm/dev/bridge/outbound`, otherwise the Bridge never sees it. |
+| `--key KEY` | 4, 5 | Send with this RabbitMQ routing key. It must reach `q/vnm/vatm/dev/bridge/inbound`, otherwise the Bridge never sees it. |
+
+An option that does not belong to a script (for example `--topic` on script 4) stops the script with the usage text.
+
+Examples:
+
+```
+# HVN sends only to CAAS. VATM is not in the list, so VATM's selector must not match,
+# and the expected result is "FAIL nothing arrived".
+tests/5-rr-rabbitmq-to-solace.sh --recipients WS_CAAS
+
+# Send your own message
+tests/2-pubsub-solace-to-rabbitmq.sh --payload ~/my-flight-plan.xml
+
+# Send to another topic that the Bridge reads
+tests/2-pubsub-solace-to-rabbitmq.sh --topic t/vnm/vatm/dev/met/v1/metar
+```
+
+## What the scripts leave behind
+
+Each run uses its own correlation-id, `bridge-test-<time>`, so it only ever picks up its own message.
+
+- **Scripts 2 and 3** create a temporary RabbitMQ queue, `q/vnm/vatm/dev/bridge-test/<correlation-id>`, bound to `x/vnm/vatm/dev/ingress`. They read their copy of the message there and delete the queue at the end. If a script is stopped halfway, RabbitMQ deletes the queue by itself after 10 minutes.
+- **Scripts 4 and 5** create a temporary Solace subscription. It disappears when the script ends.
+
+**The test messages are real messages.** Other queues on the same exchange also get a copy:
+- After scripts 2 and 3, a copy stays in `q/vnm/vatm/dev/router/in`. When the Router runs, it delivers that copy to the parties in `APAC_RECIPIENT_LIST`.
+- Script 4 can reach other queues bound to `swim` with the same key.
+
+Outside the `dev` environment, use `--recipients` with codes that are not real partners.
+
+When you have finished testing, remove the passwords from the shell:
+
+```
+unset SOLACE_PASSWORD RABBITMQ_PASSWORD
+```
+
+## See also
+
+- `../README.md`, sections "Kiểm tra bằng script" and "Kiểm tra bằng tay".
+- `../nifi/check-headers.py`: an automated check of all four directions in one run. It goes through NiFi, so it needs only the NiFi password, not the broker passwords.
