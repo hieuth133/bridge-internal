@@ -1,6 +1,6 @@
 # The Bridge is an Apache NiFi flow, not a Camel program
 
-Supersedes ADR 0003.
+Supersedes ADR 0003. Changed by ADR 0007: RabbitMQ is reached over AMQP 1.0 from Groovy scripts, not with `ConsumeAMQP` / `PublishAMQP`.
 
 The user wants the Bridge to need as little code as possible, use defaults as much as possible, and run from an official container image. We replaced the Java 21 + Camel Main program with one Apache NiFi flow:
 

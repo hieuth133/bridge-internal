@@ -1,3 +1,8 @@
+import com.rabbitmq.client.amqp.AmqpException;
+import com.rabbitmq.client.amqp.Environment;
+import com.rabbitmq.client.amqp.Management;
+import com.rabbitmq.client.amqp.Publisher;
+import com.rabbitmq.client.amqp.impl.AmqpEnvironmentBuilder;
 import com.solacesystems.jms.SolConnectionFactory;
 import com.solacesystems.jms.SolJmsUtility;
 import jakarta.jms.BytesMessage;
@@ -13,7 +18,6 @@ import jakarta.jms.Session;
 import jakarta.jms.TextMessage;
 import jakarta.jms.Topic;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -31,24 +35,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Manual Bridge test: sends one message through the running Bridge and checks that it arrives on the other broker
  * unchanged. The only change allowed is that VV_ROUTE, which exists only inside RabbitMQ, does not reach Solace.
- * The message is the same Pathfinder message nifi/check-headers.py sends.
+ * RabbitMQ is reached over AMQP 1.0 only, like every EMS in the region (ADR 0007).
  *
  *   solace-pubsub    Solace topic t/vnm/vatm/dev/atfm/v1/fpl            -> RabbitMQ x/vnm/vatm/dev/ingress (B-04)
  *   solace-rr        Solace topic tr/vnm/vatm/vnm/vna/dev/..., reply-to -> RabbitMQ x/vnm/vatm/dev/ingress (B-04)
  *   rabbitmq-pubsub  RabbitMQ x/vnm/vatm/dev/swim                       -> Solace topic (B-03)
  *   rabbitmq-rr      RabbitMQ x/vnm/vatm/dev/route, VV_ROUTE=VV_VATM    -> Solace topic, VATM selector (B-03)
- *   ping             log in to both brokers
+ *   ping             log in to both brokers, and check that B-03 and B-04 are connected to RabbitMQ over AMQP 1.0
  *
  * Solace to RabbitMQ: a temporary queue bound to the fanout x/vnm/vatm/dev/ingress gets a copy of the message, so
  * nothing is taken out of q/vnm/vatm/dev/router/in. RabbitMQ to Solace: the message is put on swim or route as the
  * Router would, and a temporary Solace subscription receives it. Both sides pick out this run's message by its
- * correlation-id. Settings come from tests/env.sh. Exit code 0 means every check passed.
+ * correlation-id. Settings come from tests/env.sh. Exit code 0 means every check passed, 1 that a check failed,
+ * 2 that the test could not run.
  */
 public class BridgeTest {
     static final String INGRESS = "x/vnm/vatm/dev/ingress", SWIM = "x/vnm/vatm/dev/swim", ROUTE = "x/vnm/vatm/dev/route";
@@ -116,6 +125,8 @@ public class BridgeTest {
             failures = run(scenario, opts);
         } catch (JMSException e) {
             fail("FAIL Solace: " + e.getMessage());
+        } catch (AmqpException e) {
+            fail("FAIL RabbitMQ: " + e.getMessage());
         } catch (java.io.IOException e) {
             fail("FAIL " + e);
         }
@@ -130,8 +141,7 @@ public class BridgeTest {
         Map<String, String> headers = pathfinderHeaders();
         switch (scenario) {
             case "ping":
-                ping(new Env());
-                return 0;
+                return ping(new Env());
             case "solace-pubsub":
                 headers.put("APAC_RECIPIENT_LIST", opts.getOrDefault("recipients", "VV_HVN"));
                 return solaceToRabbitmq(new Env(), run, opts.getOrDefault("topic", "t/vnm/vatm/dev/atfm/v1/fpl"), headers, null, payload);
@@ -157,67 +167,89 @@ public class BridgeTest {
         }
     }
 
-    static void ping(Env env) throws Exception {
+    /** Logs in to both brokers; then the Bridge's own connections must be on RabbitMQ, over AMQP 1.0. */
+    static int ping(Env env) throws Exception {
         try (Connection c = env.solace().createConnection()) {
             System.out.println("OK   Solace " + env.solaceHost + " VPN " + env.solaceVpn + " as " + env.solaceUser);
         }
-        Rabbitmq r = new Rabbitmq(env);
-        r.call("GET", "/vhosts/" + enc(env.vhost), null);
-        System.out.println("OK   RabbitMQ " + r.base + " vhost " + env.vhost + " as " + env.rabbitUser);
+        try (Rabbitmq r = new Rabbitmq(env)) {
+            System.out.println("OK   RabbitMQ " + r.where + " as " + env.rabbitUser + ", AMQP 1.0, RabbitMQ "
+                    + r.connection.connectionInfo().brokerVersion());
+        }
+        // B-03 and B-04 name their connections; the management API shows the name and the protocol of each one.
+        List<?> connections = (List<?>) new ManagementApi(env).get("/connections");
+        Report rep = new Report("Bridge connections on RabbitMQ");
+        for (String name : List.of("vatm-bridge B-03", "vatm-bridge B-04")) {
+            List<Object> protocols = new ArrayList<>();
+            for (Object o : connections) {
+                Map<?, ?> c = (Map<?, ?>) o;
+                if (c.containsValue(name) || c.get("client_properties") instanceof Map && ((Map<?, ?>) c.get("client_properties")).containsValue(name)) {
+                    protocols.add(c.get("protocol"));
+                }
+            }
+            rep.check(name, protocols, List.of("AMQP 1-0"));
+        }
+        return rep.failures;
     }
 
     /** Sends on Solace, then reads the copy that B-04 put on x/vnm/vatm/dev/ingress. */
     static int solaceToRabbitmq(Env env, String run, String topic, Map<String, String> headers, String replyTo, byte[] payload)
             throws Exception {
-        Rabbitmq r = new Rabbitmq(env);
-        String queue = "/queues/" + enc(env.vhost) + "/" + enc("q/vnm/vatm/dev/bridge-test/" + run);
-        // x-expires: RabbitMQ removes the queue by itself if this program dies before deleting it.
-        r.call("PUT", queue, Map.of("durable", false, "auto_delete", false, "arguments", Map.of("x-expires", 600000)));
-        try {
-            r.call("POST", "/bindings/" + enc(env.vhost) + "/e/" + enc(INGRESS) + "/q/" + enc("q/vnm/vatm/dev/bridge-test/" + run),
-                    Map.of("routing_key", ""));
-            try (Connection c = env.solace().createConnection()) {
-                Session s = c.createSession(false, Session.AUTO_ACKNOWLEDGE);
-                TextMessage m = s.createTextMessage(new String(payload, StandardCharsets.UTF_8));
-                for (Map.Entry<String, String> h : headers.entrySet()) {
-                    m.setStringProperty(h.getKey(), h.getValue());
+        try (Rabbitmq r = new Rabbitmq(env)) {
+            String queue = "q/vnm/vatm/dev/bridge-test/" + run;
+            Management management = r.connection.management();
+            // expires: RabbitMQ removes the queue by itself if this program dies before deleting it.
+            management.queue(queue).classic().queue().expires(Duration.ofMinutes(10)).declare();
+            try {
+                management.binding().sourceExchange(INGRESS).destinationQueue(queue).key("").bind();
+                BlockingQueue<com.rabbitmq.client.amqp.Message> arrivals = new LinkedBlockingQueue<>();
+                r.connection.consumerBuilder().queue(queue).messageHandler((context, m) -> {
+                    context.accept();
+                    if (run.equals(m.correlationId())) {
+                        arrivals.add(m);
+                    }
+                }).build();
+                try (Connection c = env.solace().createConnection()) {
+                    Session s = c.createSession(false, Session.AUTO_ACKNOWLEDGE);
+                    TextMessage m = s.createTextMessage(new String(payload, StandardCharsets.UTF_8));
+                    for (Map.Entry<String, String> h : headers.entrySet()) {
+                        m.setStringProperty(h.getKey(), h.getValue());
+                    }
+                    m.setStringProperty("contentType", CONTENT_TYPE);
+                    m.setStringProperty("messageId", run);
+                    m.setJMSCorrelationID(run);
+                    if (replyTo != null) {
+                        m.setJMSReplyTo(s.createQueue(replyTo));
+                    }
+                    MessageProducer p = s.createProducer(s.createTopic(topic));
+                    p.setDeliveryMode(DeliveryMode.PERSISTENT);
+                    p.send(m);
                 }
-                m.setStringProperty("contentType", CONTENT_TYPE);
-                m.setStringProperty("messageId", run);
-                m.setJMSCorrelationID(run);
-                if (replyTo != null) {
-                    m.setJMSReplyTo(s.createQueue(replyTo));
+                System.out.println("Sent to Solace topic " + topic + ", correlation-id " + run + ". Waiting for it on RabbitMQ " + INGRESS + " ...");
+                com.rabbitmq.client.amqp.Message got = arrivals.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                if (got == null) {
+                    System.out.println("FAIL nothing arrived on RabbitMQ in " + TIMEOUT_SECONDS + " s (is the Bridge running, and does"
+                            + " Solace queue q/vnm/vatm/dev/bridge/outbound subscribe to " + topic + "?)");
+                    return 1;
                 }
-                MessageProducer p = s.createProducer(s.createTopic(topic));
-                p.setDeliveryMode(DeliveryMode.PERSISTENT);
-                p.send(m);
+                Map<String, Object> arrived = new LinkedHashMap<>();
+                got.forEachProperty(arrived::put);
+                Report rep = new Report("Arrived on RabbitMQ " + got.annotation("x-exchange") + " (AMQP 1.0)");
+                rep.check("routing key", got.annotation("x-routing-key"), topic.replace('/', '.'));
+                rep.headers(arrived, headers);
+                List<String> extra = new ArrayList<>(new TreeSet<>(arrived.keySet()));
+                extra.removeAll(headers.keySet());
+                rep.check("no other header", extra, List.of());
+                rep.check("correlation-id", got.correlationId(), run);
+                rep.check("content-type", got.contentType(), CONTENT_TYPE);
+                rep.check("message-id", got.messageId(), run);
+                rep.check("reply-to", got.replyTo(), replyTo);
+                rep.check("durable", got.durable(), true);
+                rep.payload(got.body(), payload);
+                return rep.failures;
+            } finally {
+                management.queueDelete(queue);
             }
-            System.out.println("Sent to Solace topic " + topic + ", correlation-id " + run + ". Waiting for it on RabbitMQ " + INGRESS + " ...");
-            Map<?, ?> got = r.waitFor(queue, run);
-            if (got == null) {
-                System.out.println("FAIL nothing arrived on RabbitMQ in " + TIMEOUT_SECONDS + " s (is the Bridge running, and does"
-                        + " Solace queue q/vnm/vatm/dev/bridge/outbound subscribe to " + topic + "?)");
-                return 1;
-            }
-            Map<?, ?> props = (Map<?, ?>) got.get("properties");
-            Map<String, Object> arrived = new LinkedHashMap<>();
-            if (props.get("headers") instanceof Map) {
-                ((Map<?, ?>) props.get("headers")).forEach((k, v) -> arrived.put(String.valueOf(k), v));
-            }
-            Report rep = new Report("Arrived on RabbitMQ " + got.get("exchange"));
-            rep.check("routing key", got.get("routing_key"), topic.replace('/', '.'));
-            rep.headers(arrived, headers);
-            List<String> extra = new ArrayList<>(new TreeSet<>(arrived.keySet()));
-            extra.removeAll(headers.keySet());
-            rep.check("no other header", extra, List.of());
-            rep.check("correlation-id", props.get("correlation_id"), run);
-            rep.check("content-type", props.get("content_type"), CONTENT_TYPE);
-            rep.check("message-id", props.get("message_id"), run);
-            rep.check("reply-to", props.get("reply_to"), replyTo);
-            rep.payload(Base64.getDecoder().decode((String) got.get("payload")), payload);
-            return rep.failures;
-        } finally {
-            r.call("DELETE", queue, null);
         }
     }
 
@@ -232,25 +264,24 @@ public class BridgeTest {
             MessageConsumer consumer = s.createConsumer(s.createTopic(topic), selector);
             c.start();
 
-            Map<String, Object> sentHeaders = new LinkedHashMap<>(headers);
-            if (headerRouting) {
-                sentHeaders.put("VV_ROUTE", "VV_VATM");  // the Router's copy for VATM; it must not reach Solace
-            }
-            Map<String, Object> props = new LinkedHashMap<>();
-            props.put("delivery_mode", 2);
-            props.put("content_type", CONTENT_TYPE);
-            props.put("correlation_id", run);
-            props.put("message_id", run);
-            if (replyTo != null) {
-                props.put("reply_to", replyTo);
-            }
-            props.put("headers", sentHeaders);
-            Map<?, ?> res = (Map<?, ?>) new Rabbitmq(env).call("POST", "/exchanges/" + enc(env.vhost) + "/" + enc(exchange) + "/publish",
-                    Map.of("properties", props, "routing_key", key, "payload", Base64.getEncoder().encodeToString(payload),
-                            "payload_encoding", "base64"));
-            if (!Boolean.TRUE.equals(res.get("routed"))) {
-                System.out.println("FAIL RabbitMQ " + exchange + " routed key " + key + " to no queue");
-                return 1;
+            try (Rabbitmq r = new Rabbitmq(env)) {
+                Publisher publisher = r.connection.publisherBuilder().exchange(exchange).key(key).build();
+                com.rabbitmq.client.amqp.Message m = publisher.message(payload).durable(true).contentType(CONTENT_TYPE)
+                        .correlationId(run).messageId(run);
+                if (replyTo != null) {
+                    m.replyTo(replyTo);
+                }
+                headers.forEach(m::property);
+                if (headerRouting) {
+                    m.property("VV_ROUTE", "VV_VATM");  // the Router's copy for VATM; it must not reach Solace
+                }
+                CompletableFuture<Publisher.Context> outcome = new CompletableFuture<>();
+                publisher.publish(m, outcome::complete);
+                Publisher.Status status = outcome.get(TIMEOUT_SECONDS, TimeUnit.SECONDS).status();
+                if (status != Publisher.Status.ACCEPTED) {
+                    System.out.println("FAIL RabbitMQ " + exchange + " did not accept key " + key + ": " + status);
+                    return 1;
+                }
             }
             System.out.println("Sent to RabbitMQ " + exchange + " key " + key + (headerRouting ? " with VV_ROUTE=VV_VATM" : "")
                     + ", correlation-id " + run + ". Waiting for it on Solace topic " + topic + " ...");
@@ -291,10 +322,6 @@ public class BridgeTest {
             return "queue " + ((Queue) d).getQueueName();
         }
         return d instanceof Topic ? "topic " + ((Topic) d).getTopicName() : null;
-    }
-
-    static String enc(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8);
     }
 
     static void fail(String message) {
@@ -343,8 +370,8 @@ public class BridgeTest {
     /** Settings from tests/env.sh. */
     static class Env {
         final String solaceHost = need("SOLACE_HOST"), solaceVpn = need("SOLACE_VPN"), solaceUser = need("SOLACE_USERNAME");
-        final String rabbitHost = need("RABBITMQ_HOST"), rabbitPort = need("RABBITMQ_MANAGEMENT_PORT"), vhost = need("RABBITMQ_VHOST");
-        final String rabbitUser = need("RABBITMQ_USERNAME");
+        final String rabbitHost = need("RABBITMQ_HOST"), rabbitPort = need("RABBITMQ_PORT"), vhost = need("RABBITMQ_VHOST");
+        final String rabbitUser = need("RABBITMQ_USERNAME"), managementPort = need("RABBITMQ_MANAGEMENT_PORT");
 
         static String need(String name) {
             String v = System.getenv(name);
@@ -365,50 +392,53 @@ public class BridgeTest {
         }
     }
 
-    /** RabbitMQ management HTTP API. */
-    static class Rabbitmq {
+    /** RabbitMQ over AMQP 1.0. */
+    static class Rabbitmq implements AutoCloseable {
+        final Environment environment = new AmqpEnvironmentBuilder().build();
+        final com.rabbitmq.client.amqp.Connection connection;
+        final String where;
+
+        Rabbitmq(Env env) {
+            where = env.rabbitHost + ":" + env.rabbitPort + " vhost " + env.vhost;
+            try {
+                connection = environment.connectionBuilder().host(env.rabbitHost).port(Integer.parseInt(env.rabbitPort))
+                        .virtualHost(env.vhost).username(env.rabbitUser).password(Env.need("RABBITMQ_PASSWORD")).name("bridge-test").build();
+            } catch (RuntimeException e) {
+                environment.close();
+                throw e;
+            }
+        }
+
+        @Override
+        public void close() {
+            environment.close();  // closes the connection too
+        }
+    }
+
+    /** RabbitMQ management HTTP API, read only: it shows the protocol of each connection, which AMQP itself does not. */
+    static class ManagementApi {
         final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)  // RabbitMQ drops h2c upgrades
                 .connectTimeout(Duration.ofSeconds(10)).build();
         final String base, auth;
 
-        Rabbitmq(Env env) {
-            base = "http://" + env.rabbitHost + ":" + env.rabbitPort + "/api";
+        ManagementApi(Env env) {
+            base = "http://" + env.rabbitHost + ":" + env.managementPort + "/api";
             auth = "Basic " + Base64.getEncoder().encodeToString((env.rabbitUser + ":" + Env.need("RABBITMQ_PASSWORD"))
                     .getBytes(StandardCharsets.UTF_8));
         }
 
-        Object call(String method, String path, Object body) throws Exception {
-            HttpRequest req = HttpRequest.newBuilder(URI.create(base + path)).timeout(Duration.ofSeconds(30)).header("Authorization", auth)
-                    .header("Content-Type", "application/json")
-                    .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(Json.write(body)))
-                    .build();
+        Object get(String path) throws Exception {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(base + path)).timeout(Duration.ofSeconds(30)).header("Authorization", auth).build();
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() >= 300) {
                 String err = res.body();
-                fail("FAIL RabbitMQ " + method + " " + path + " -> " + res.statusCode() + ": " + err.substring(0, Math.min(200, err.length())));
+                fail("FAIL RabbitMQ management GET " + path + " -> " + res.statusCode() + ": " + err.substring(0, Math.min(200, err.length())));
             }
-            return res.body().isEmpty() ? null : Json.read(res.body());
-        }
-
-        /** Takes messages off the queue (its path in the API) until the one with this correlation-id shows up. */
-        Map<?, ?> waitFor(String queue, String correlationId) throws Exception {
-            long deadline = System.currentTimeMillis() + TIMEOUT_SECONDS * 1000L;
-            while (System.currentTimeMillis() < deadline) {
-                List<?> got = (List<?>) call("POST", queue + "/get",
-                        Map.of("count", 50, "ackmode", "ack_requeue_false", "encoding", "base64", "truncate", 100000000));
-                for (Object o : got) {
-                    Map<?, ?> m = (Map<?, ?>) o;
-                    if (correlationId.equals(((Map<?, ?>) m.get("properties")).get("correlation_id"))) {
-                        return m;
-                    }
-                }
-                Thread.sleep(1000);
-            }
-            return null;
+            return Json.read(res.body());
         }
     }
 
-    /** Just enough JSON for the management API. */
+    /** Just enough JSON to read the management API. */
     static class Json {
         final String s;
         int i;
@@ -419,31 +449,6 @@ public class BridgeTest {
 
         static Object read(String s) {
             return new Json(s).value();
-        }
-
-        static String write(Object o) {
-            if (o == null) {
-                return "null";
-            }
-            if (o instanceof Map) {
-                List<String> parts = new ArrayList<>();
-                ((Map<?, ?>) o).forEach((k, v) -> parts.add(write(String.valueOf(k)) + ":" + write(v)));
-                return "{" + String.join(",", parts) + "}";
-            }
-            if (o instanceof Number || o instanceof Boolean) {
-                return String.valueOf(o);
-            }
-            StringBuilder b = new StringBuilder("\"");
-            for (char c : o.toString().toCharArray()) {
-                if (c == '"' || c == '\\') {
-                    b.append('\\').append(c);
-                } else if (c < 0x20) {
-                    b.append(String.format("\\u%04x", (int) c));
-                } else {
-                    b.append(c);
-                }
-            }
-            return b.append('"').toString();
         }
 
         Object value() {

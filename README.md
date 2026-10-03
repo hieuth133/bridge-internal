@@ -13,7 +13,7 @@ Mỗi chiều đi được theo hai cách định tuyến:
 
 Các thuật ngữ được định nghĩa trong `CONTEXT.md`.
 
-Bridge là một flow Apache NiFi (`nifi/bridge-flow.json`), chạy bằng image chính thức `docker.io/apache/nifi:2.12.0`. Không có code để build. Lý do chọn cách này nằm ở `docs/adr/0004-apache-nifi-replaces-camel.md`.
+Bridge là một flow Apache NiFi (`nifi/bridge-flow.json`), chạy bằng image chính thức `docker.io/apache/nifi:2.12.0`. Không có code để build. Lý do chọn cách này nằm ở `docs/adr/0004-apache-nifi-replaces-camel.md`. Bridge nói AMQP 1.0 với RabbitMQ, như mọi EMS trong vùng (`docs/adr/0007-bridge-talks-amqp-1-0.md`).
 
 Đây là bản **thử nghiệm**, mọi object dùng token môi trường `dev`. Bridge chỉ dùng object mới tạo ở bước 1, không sửa object hay cấu hình nào đang có trên hai broker.
 
@@ -25,7 +25,7 @@ NiFi không tự tạo exchange hay queue. Tạo các object dưới đây bằn
 
 ### RabbitMQ
 
-Các object RabbitMQ thuộc phía RabbitMQ (Router và các bên nhận). Bridge chỉ dùng hai cái: gửi vào exchange `x/vnm/vatm/dev/ingress` và đọc queue `q/vnm/vatm/dev/bridge/inbound`. Các object còn lại cần cho [Demo](#demo) và [script kiểm tra](#kiểm-tra-bằng-script).
+Các object RabbitMQ thuộc phía RabbitMQ (Router và các bên nhận). Bridge chỉ dùng hai cái: gửi vào exchange `x/vnm/vatm/dev/ingress` và đọc queue `q/vnm/vatm/dev/bridge/inbound`. Các object còn lại cần cho [Demo](#demo) và [script kiểm tra](#kiểm-tra-bằng-tay).
 
 Mở RabbitMQ UI `http://192.168.121.61:15672`, làm trong vhost `swim_sg`. Mọi exchange đều `Durable`; mọi queue đều Type `Classic`, Durability `Durable`.
 
@@ -79,14 +79,16 @@ Không subscribe rộng `t/vnm/vatm/dev/>`: topic `t/vnm/vatm/dev/swim/>` đang 
 
 Bản trước của Bridge dùng exchange `x.swim.dev.bridge.out`, `x.swim.dev.bridge.in`, queue `q/vnm/vatm/dev/bridge/in`, `q/vnm/vatm/dev/bridge/in-dlq` trên RabbitMQ và Durable Topic Endpoint `q/vnm/vatm/dev/bridge/out-atfm` trên Solace. Bridge không dùng chúng nữa và không xoá chúng. Topic Endpoint `out-atfm` vẫn giữ lại mọi message `t/vnm/vatm/dev/atfm/>` cho tới khi đầy. Khi không cần nữa, tự xoá: RabbitMQ UI → mở exchange / queue → **Delete**; Broker Manager → **Queues** → tab **Topic Endpoints** → `q/vnm/vatm/dev/bridge/out-atfm` → **Delete**.
 
-## 2. Tải thư viện Solace JMS
+## 2. Tải thư viện Solace JMS và RabbitMQ AMQP 1.0
 
-NiFi cần jar của Solace để nói chuyện với Solace. Danh sách jar nằm trong `nifi/solace-jars.txt`, tất cả lấy từ Maven Central. Chạy trong thư mục của repo:
+NiFi cần jar của Solace để nói chuyện với Solace, và thư viện AMQP 1.0 của RabbitMQ để nói chuyện với RabbitMQ: processor RabbitMQ có sẵn của NiFi chỉ nói AMQP 0-9-1, còn vùng dùng AMQP 1.0 (`docs/adr/0007-bridge-talks-amqp-1-0.md`). Danh sách jar nằm trong `nifi/solace-jars.txt` và `nifi/rabbitmq-jars.txt`, tất cả lấy từ Maven Central. Hai bộ jar nằm ở hai thư mục riêng, để jar của RabbitMQ không lẫn vào chỗ NiFi nạp Solace JMS. Chạy trong thư mục của repo:
 
 ```
-mkdir -p lib
+mkdir -p lib lib-rabbitmq
 (cd lib && xargs -n1 curl -fsSLO < ../nifi/solace-jars.txt)
-ls lib | wc -l     # phải ra 18
+(cd lib-rabbitmq && xargs -n1 curl -fsSLO < ../nifi/rabbitmq-jars.txt)
+ls lib | wc -l            # phải ra 18
+ls lib-rabbitmq | wc -l   # phải ra 11
 ```
 
 ## 3. Chạy NiFi
@@ -103,7 +105,7 @@ Liệt kê các tên mà bạn sẽ gõ trên trình duyệt để mở NiFi, d�
 export NIFI_WEB_PROXY_HOST='solace.tailfac6af.ts.net:8443'
 ```
 
-Chạy trong thư mục của repo (vì lệnh mount `./lib`):
+Chạy trong thư mục của repo (vì lệnh mount `./lib` và `./lib-rabbitmq`):
 
 ```
 podman run -d --name vatm-bridge --network=host --restart=always \
@@ -116,6 +118,7 @@ podman run -d --name vatm-bridge --network=host --restart=always \
   -v vatm-bridge-content:/opt/nifi/nifi-current/content_repository \
   -v vatm-bridge-provenance:/opt/nifi/nifi-current/provenance_repository \
   -v ./lib:/opt/nifi/solace-lib:ro,Z \
+  -v ./lib-rabbitmq:/opt/nifi/rabbitmq-lib:ro,Z \
   docker.io/apache/nifi:2.12.0
 ```
 
@@ -124,6 +127,7 @@ podman run -d --name vatm-bridge --network=host --restart=always \
 - NiFi tạo chứng chỉ HTTPS tự ký ở lần chạy đầu tiên. Chứng chỉ chỉ chứa `localhost`, tên máy và các tên trong `NIFI_WEB_PROXY_HOST`. Mở bằng tên khác, hay bằng địa chỉ IP, sẽ bị lỗi `Invalid SNI`. Muốn thêm tên sau này thì phải gỡ hẳn rồi chạy lại từ đầu (xem Vận hành) và nạp lại flow.
 - Các volume `vatm-bridge-*` giữ flow, mật khẩu đã nhập và các message đang trên đường đi. Đừng xoá chúng khi Bridge còn dùng.
 - Mật khẩu đăng nhập chỉ được đặt ở lần chạy đầu tiên, sau đó nó được lưu trong volume `vatm-bridge-conf`.
+- Container chạy từ trước khi có mount `./lib-rabbitmq`: tải jar ở bước 2, `podman rm -f vatm-bridge`, rồi chạy lại lệnh trên. Các volume vẫn giữ flow, mật khẩu và message đang chờ.
 
 Chờ khoảng 1 phút rồi xem log. Khi thấy dòng `Started Application` là NiFi đã sẵn sàng:
 
@@ -188,8 +192,8 @@ flowchart LR
     SI["topic t/vnm/acv/...<br/>tr/*/*/vnm/vatm/..."]
   end
   subgraph NiFi["NiFi: Bridge"]
-    B4["B-04: ConsumeJMS → ExecuteGroovyScript<br/>(key = topic / thành .) → PublishAMQP"]
-    B3["B-03: ConsumeAMQP → ExecuteGroovyScript<br/>(gửi lên Solace topic = key . thành /)"]
+    B4["B-04: ConsumeJMS → ExecuteGroovyScript<br/>(key = topic / thành .) → ExecuteGroovyScript<br/>(gửi vào RabbitMQ, AMQP 1.0)"]
+    B3["B-03: ExecuteGroovyScript (đọc RabbitMQ, AMQP 1.0)<br/>→ ExecuteGroovyScript<br/>(gửi lên Solace topic = key . thành /)"]
   end
   subgraph RabbitMQ
     IN["x/vnm/vatm/dev/ingress<br/>fanout"] --> RQ["q/vnm/vatm/dev/router/in"]
@@ -209,11 +213,13 @@ flowchart LR
 
 B-04 đưa mọi message từ Solace vào `ingress`, cùng chỗ với message của đối tác; từ đó Router định tuyến. B-03 đọc những gì Router gửi tới VATM. Khi Router chưa chạy (như môi trường `dev` hiện nay), message outbound nằm chờ ở `q/vnm/vatm/dev/router/in`.
 
-Khi broker bên kia không nhận, NiFi giữ message lại và thử gửi lại, không làm mất message: B-04 `PublishAMQP` có nhánh `failure` quay về chính nó; B-03 gửi mỗi lô trong một transaction JMS, nên khi Solace không nhận thì cả lô quay về connection trước nó (rollback) và được gửi lại sau, không có bản trùng. Một message B-03 không chuyển được thành JMS (ví dụ tên header không hợp lệ) đi vào nhánh `failure` vòng quanh processor, các message khác vẫn đi tiếp. Các processor đọc (ConsumeAMQP, ConsumeJMS) chỉ ack message với broker khi message đã được ghi vào kho của NiFi (volume `vatm-bridge-flowfile`), nên NiFi dừng giữa chừng cũng không mất message.
+Khi broker bên kia không nhận, NiFi giữ message lại và thử gửi lại, không làm mất message: B-04 chỉ coi message là đã gửi khi RabbitMQ trả lời `accepted`, nếu không message vào nhánh `failure` quay về chính processor gửi; B-03 gửi mỗi lô trong một transaction JMS, nên khi Solace không nhận thì cả lô quay về connection trước nó (rollback) và được gửi lại sau, không có bản trùng. Một message B-03 không chuyển được thành JMS (ví dụ tên header không hợp lệ) đi vào nhánh `failure` vòng quanh processor, các message khác vẫn đi tiếp. Các processor đọc (`B-03 Consume RabbitMQ ...`, ConsumeJMS) chỉ ack message với broker khi message đã được ghi vào kho của NiFi (volume `vatm-bridge-flowfile`), nên NiFi dừng giữa chừng cũng không mất message; tệ nhất là một message tới hai lần.
+
+Bridge nói AMQP 1.0 với RabbitMQ (cổng `5672`), giống mọi EMS trong vùng. Chưa làm: tài liệu v4 dùng AMQP 1.0 qua TLS/mTLS cổng `5671`; Bridge hiện nối cổng `5672` không mã hoá.
 
 ## Demo
 
-Phần này demo trên UI cả bốn đường: Outbound và Inbound, mỗi chiều theo topic và theo header. Message mang header theo template Pathfinder (`docs/Documents/Pathfinder_Headers_Metadata_updated 24 Sep 2026.xlsx`, sheet "Headers for SIPG Test"). Muốn kiểm tra tự động, so từng byte, thì xem [Kiểm tra bằng script](#kiểm-tra-bằng-script).
+Phần này demo trên UI cả bốn đường: Outbound và Inbound, mỗi chiều theo topic và theo header. Message mang header theo template Pathfinder (`docs/Documents/Pathfinder_Headers_Metadata_updated 24 Sep 2026.xlsx`, sheet "Headers for SIPG Test"). Muốn kiểm tra tự động, so từng byte, thì xem [Kiểm tra bằng tay](#kiểm-tra-bằng-tay).
 
 Bạn dùng ba trang:
 - NiFi `https://<tên>:8443/nifi`
@@ -230,7 +236,7 @@ Trong group `Solace RabbitMQ Bridge` có sẵn group con **`Bridge demo`**, đi 
 | `Solace receiver (topic): subscribe t/vnm/acv/dev/>` | Nhận message Bridge đưa lên Solace theo topic. |
 | `Solace receiver (header): subscribe tr/*/*/vnm/vatm/dev/> where APAC_RECIPIENT_LIST has VV_VATM` | Nhận message Request/Reply gửi tới VATM, lọc bằng selector ở mục [Object](#object). |
 | | Cả hai receiver đổ vào connection `received from Solace`. |
-| `RabbitMQ sender: Pathfinder message` → `RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would` | Tạo cùng message mẫu như một đối tác (`APAC_SOURCE` = `VV_HVN`) và gửi thẳng vào `x/vnm/vatm/dev/route` với header `VV_ROUTE` = `VV_VATM`, đúng như bản Router tạo cho VATM. Router không thuộc Bridge, nên demo đứng thay nó. Key lấy từ property `routingKey` (mặc định `tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request`, `APAC_RECIPIENT_LIST` = `VV_VATM,WS_CAAS`). Bản đã gửi nằm ở `sent to RabbitMQ`. |
+| `RabbitMQ sender: Pathfinder message` → `RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would (AMQP 1.0)` | Tạo cùng message mẫu như một đối tác (`APAC_SOURCE` = `VV_HVN`) và gửi thẳng vào `x/vnm/vatm/dev/route` với header `VV_ROUTE` = `VV_VATM`, đúng như bản Router tạo cho VATM. Router không thuộc Bridge, nên demo đứng thay nó. Key lấy từ property `routingKey` (mặc định `tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request`, `APAC_RECIPIENT_LIST` = `VV_VATM,WS_CAAS`). Bản đã gửi nằm ở `sent to RabbitMQ`. |
 
 **Xem header và payload của một message trong NiFi:** chuột phải vào connection (mũi tên có tên, ví dụ `received from Solace`) → **List Queue**. Ở dòng message, bấm ⋮ → **View Details**. Tab **Attributes** là các header, nút **View** (hoặc ⋮ → **View Content**) mở payload.
 
@@ -274,38 +280,13 @@ Selector là lớp lọc phía Solace, cho các ứng dụng VATM chỉ muốn n
 2. `received from Solace` có message từ `Solace receiver (topic)`, `jms_destination` = `t/vnm/acv/dev/aodb/v1/departure/publish/vvts`, không có `VV_ROUTE`.
 3. Đặt lại `routingKey` = `tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request`, `APAC_SOURCE` = `VV_HVN`.
 
-Message Pub/Sub thật thì Router gửi vào `x/vnm/vatm/dev/swim`, và binding `t.vnm.acv.dev.#` đưa nó vào cùng queue `bridge/inbound`; demo gửi qua `route` nhờ `VV_ROUTE` = `VV_VATM`, B-03 làm y như nhau. Muốn gửi đúng đường `swim` thì tự gõ trong RabbitMQ UI: Exchanges → `x/vnm/vatm/dev/swim` → **Publish message**, Routing key như trên, vài header kiểu `String` (ví dụ `APAC_SOURCE`, `APAC_RECIPIENT_LIST`), Properties `content_type` = `application/xml`.
+Message Pub/Sub thật thì Router gửi vào `x/vnm/vatm/dev/swim`, và binding `t.vnm.acv.dev.#` đưa nó vào cùng queue `bridge/inbound`; demo gửi qua `route` nhờ `VV_ROUTE` = `VV_VATM`, B-03 làm y như nhau. Muốn gửi đúng đường `swim` thì tự gõ trong RabbitMQ UI: Exchanges → `x/vnm/vatm/dev/swim` → **Publish message**, Routing key như trên, vài header kiểu `String` (ví dụ `APAC_SOURCE`, `APAC_RECIPIENT_LIST`), Properties `content_type` = `application/xml`. Tên header không bắt đầu bằng `x-`: với cách gửi này RabbitMQ coi header `x-...` là annotation của AMQP 1.0, không phải header, nên Bridge không chuyển nó.
 
 ### Dọn dẹp
 
 1. NiFi: chuột phải vào từng connection `sent to Solace`, `received from Solace` và `sent to RabbitMQ` → **Empty Queue**.
 2. Chuột phải vào nền trống trong group `Bridge demo` → **Stop**, rồi lại chuột phải → **Disable**.
 3. RabbitMQ UI: lấy message demo outbound ra khỏi queue `q/vnm/vatm/dev/router/in`: **Get messages** với Ack Mode `Automatic ack`. Chỉ dùng **Purge** khi chắc chắn trong queue chỉ có message demo.
-
-### Kiểm tra bằng script
-
-`nifi/check-headers.py` gửi message có đủ 14 header Pathfinder (cả giá trị có dấu phẩy, dấu hai chấm, dấu `-`) và payload XML khoảng 19 KB (tiếng Việt, `→`, `&amp;`, dấu nháy, tab) qua 4 tình huống:
-- Outbound topic;
-- Outbound header, danh sách `VV_VATM,VV_HVN,WS_CAAS`;
-- Inbound topic, danh sách `VV_VATM, WS_CAAS` (có khoảng trắng, để chắc Bridge không bỏ nó);
-- Inbound header: HVN gửi tới `VV_VATM,WS_CAAS`, có reply-to là một queue, bắt bằng selector.
-
-Inbound được gửi thẳng vào `swim`/`route` như Router sẽ làm (bản header mang `VV_ROUTE` = `VV_VATM`); Outbound được đọc ở `q/vnm/vatm/dev/router/in`. Với mỗi tình huống, script kiểm tra:
-- message tới đúng chỗ, đúng một lần, với đúng topic hoặc routing key;
-- từng header **bằng hệt** bản gửi, kể cả `APAC_TIMESTAMP`; bên RabbitMQ không có header lạ, bên Solace không có `VV_ROUTE`;
-- correlation-id, content-type, reply-to, message-id và từng byte payload.
-
-Chỉ cần Python 3 có sẵn trên máy, không cần thư viện nào thêm. Chạy trên máy có NiFi, khi Bridge đang chạy và các object ở bước 1 đã có:
-
-```
-python3 nifi/check-headers.py
-```
-
-Script hỏi mật khẩu đăng nhập NiFi (hoặc đọc biến `NIFI_PASSWORD`). Nó không cần mật khẩu broker, vì nó tạo một group tạm trong NiFi dùng chính Parameter Context `bridge`. Khi chạy xong:
-- group tạm bị xoá;
-- message test bị lấy ra khỏi `q/vnm/vatm/dev/router/in`, nhưng chỉ khi queue không còn message nào khác; nếu không, script để chúng lại và báo.
-
-Kết quả đúng kết thúc bằng `PASS`. Mỗi chỗ sai được in `FAIL` kèm giá trị mong đợi, và script thoát với mã 1. Các biến tuỳ chọn: `NIFI_URL` (mặc định `https://localhost:8443`), `NIFI_USERNAME` (mặc định `admin`), `RABBITMQ_MANAGEMENT_PORT` (mặc định `15672`).
 
 ### Kiểm tra bằng tay
 
@@ -321,7 +302,7 @@ Thư mục `tests/` có các script để tester tự chạy, mỗi script kiể
 
 Router chưa chạy, nên script 4 và 5 gửi thẳng vào `swim`/`route` như Router sẽ làm. Request/Reply chỉ kiểm tra một chiều: request tới bên kia với reply-to và correlation-id nguyên vẹn. Trả lời là việc của bên nhận.
 
-Mỗi máy cần Java 11 trở lên, `curl` và một bản sao của repo này. Máy RabbitMQ phải tới được Solace cổng `55555`, máy Solace phải tới được RabbitMQ management cổng `15672`. Không cần NiFi hay Python.
+Mỗi máy cần Java 11 trở lên, `curl` và một bản sao của repo này. Cả hai máy phải tới được Solace cổng `55555`, RabbitMQ cổng `5672` (AMQP 1.0) và `15672` (management, chỉ để đọc danh sách connection). Không cần NiFi hay Python.
 
 1. Trong thư mục repo, chạy:
 
@@ -329,17 +310,17 @@ Mỗi máy cần Java 11 trở lên, `curl` và một bản sao của repo này.
    source tests/env.sh
    ```
 
-   Mặc định là Solace `tcp://localhost:55555`, VPN `default`, user `hieu`; RabbitMQ `192.168.121.61`, management port `15672`, vhost `swim_sg`, user `hieu`. Muốn khác thì export trước khi `source` (`SOLACE_HOST`, `SOLACE_VPN`, `SOLACE_USERNAME`, `RABBITMQ_HOST`, `RABBITMQ_MANAGEMENT_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USERNAME`). Ví dụ trên máy RabbitMQ: `export SOLACE_HOST=tcp://solace.tailfac6af.ts.net:55555`.
+   Mặc định là Solace `tcp://localhost:55555`, VPN `default`, user `hieu`; RabbitMQ `192.168.121.61`, port `5672`, management port `15672`, vhost `swim_sg`, user `hieu`. Muốn khác thì export trước khi `source` (`SOLACE_HOST`, `SOLACE_VPN`, `SOLACE_USERNAME`, `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_MANAGEMENT_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USERNAME`). Ví dụ trên máy RabbitMQ: `export SOLACE_HOST=tcp://solace.tailfac6af.ts.net:55555`.
 
-   Script hỏi mật khẩu Solace và RabbitMQ nếu chưa có (`SOLACE_PASSWORD`, `RABBITMQ_PASSWORD`). Mật khẩu chỉ nằm trong shell đang mở, không ghi ra file. Nếu thiếu jar, script tự tải từ Maven Central: jar Solace JMS (`nifi/solace-jars.txt`) vào `lib/`, và `jakarta.jms-api` (`tests/jars.txt`) vào `tests/lib/`. Jar sau để riêng, vì NiFi đã có sẵn nó và không được có thêm một bản trong `lib/` mà NiFi dùng.
+   Script hỏi mật khẩu Solace và RabbitMQ nếu chưa có (`SOLACE_PASSWORD`, `RABBITMQ_PASSWORD`). Mật khẩu chỉ nằm trong shell đang mở, không ghi ra file. Nếu thiếu jar, script tự tải từ Maven Central: jar Solace JMS (`nifi/solace-jars.txt`) vào `lib/`, thư viện AMQP 1.0 của RabbitMQ (`nifi/rabbitmq-jars.txt`) vào `lib-rabbitmq/`, và `jakarta.jms-api`, `slf4j-nop` (`tests/jars.txt`) vào `tests/lib/`. Hai jar sau để riêng, vì NiFi đã có sẵn chúng và không được có thêm một bản trong thư mục mà NiFi dùng.
 
-   Kết quả đúng: `OK   java`, `OK   jars`, `OK   Solace`, `OK   RabbitMQ`, `PASS`. Nếu đăng nhập sai, mật khẩu bị xoá để lần `source` sau hỏi lại. Kiểm tra xong thì xoá mật khẩu khỏi shell: `unset SOLACE_PASSWORD RABBITMQ_PASSWORD`. Không gõ `export SOLACE_PASSWORD=...` trực tiếp, vì lệnh đó nằm lại trong history; để script hỏi.
+   Kết quả đúng: `OK   java`, `OK   jars`, `OK   Solace`, `OK   RabbitMQ ... AMQP 1.0`, rồi `OK   vatm-bridge B-03` và `OK   vatm-bridge B-04` (hai connection của Bridge trên RabbitMQ đều là `AMQP 1-0`), `PASS`. Nếu thiếu một connection, hoặc nó không phải AMQP 1.0, thì Bridge chưa chạy hoặc chưa là bản AMQP 1.0: script in `FAIL`. Nếu đăng nhập sai, mật khẩu bị xoá để lần `source` sau hỏi lại. Kiểm tra xong thì xoá mật khẩu khỏi shell: `unset SOLACE_PASSWORD RABBITMQ_PASSWORD`. Không gõ `export SOLACE_PASSWORD=...` trực tiếp, vì lệnh đó nằm lại trong history; để script hỏi.
 2. Trên máy Solace chạy `tests/2-pubsub-solace-to-rabbitmq.sh` và `tests/3-rr-solace-to-rabbitmq.sh`. Trên máy RabbitMQ chạy `tests/4-pubsub-rabbitmq-to-solace.sh` và `tests/5-rr-rabbitmq-to-solace.sh`. Bridge phải đang chạy.
 
-Mỗi script gửi một message có correlation-id riêng (`bridge-test-<thời gian>`), mặc định giống message của `check-headers.py`, rồi đợi tối đa 30 giây ở broker bên kia. Nó in từng dòng `OK`/`FAIL`:
+Mỗi script gửi một message có correlation-id riêng (`bridge-test-<thời gian>`), mặc định có đủ 14 header Pathfinder (cả giá trị có dấu phẩy, dấu hai chấm, dấu `-`) và payload XML khoảng 19 KB (tiếng Việt, `→`, `&amp;`, dấu nháy, tab), rồi đợi tối đa 30 giây ở broker bên kia. Nó in từng dòng `OK`/`FAIL`:
 - topic hoặc routing key;
 - 14 header Pathfinder bằng hệt bản gửi, kể cả `APAC_TIMESTAMP`; bên RabbitMQ không có header lạ, bên Solace không có `VV_ROUTE`;
-- correlation-id, content-type, message-id, reply-to và từng byte payload.
+- correlation-id, content-type, message-id, reply-to, `durable` (bên RabbitMQ) và từng byte payload.
 
 Kết thúc bằng `PASS` (mã thoát 0) hoặc `FAIL` (mã 1). Mã 2 nghĩa là chưa chạy được: thiếu biến, sai mật khẩu, không kết nối được.
 
@@ -349,7 +330,7 @@ Tuỳ chọn:
 - `--topic TOPIC` (script 2, 3) hoặc `--key KEY` (script 4, 5): gửi tới topic hoặc routing key khác. Topic phải nằm trong subscription của Solace queue `q/vnm/vatm/dev/bridge/outbound`, key phải tới được `q/vnm/vatm/dev/bridge/inbound`; nếu không, message không đi qua Bridge.
 
 Script không lấy message của ai:
-- Script 2 và 3 tạo queue tạm `q/vnm/vatm/dev/bridge-test/<correlation-id>` gắn vào fanout `x/vnm/vatm/dev/ingress`, đọc bản sao message ở đó, rồi xoá queue. Nếu script bị ngắt giữa chừng, RabbitMQ tự xoá queue sau 10 phút. Bản gốc vẫn vào `q/vnm/vatm/dev/router/in` như mọi message outbound và nằm chờ Router.
+- Script 2 và 3 tạo queue tạm `q/vnm/vatm/dev/bridge-test/<correlation-id>` (qua AMQP 1.0) gắn vào fanout `x/vnm/vatm/dev/ingress`, đọc bản sao message ở đó, rồi xoá queue. Nếu script bị ngắt giữa chừng, RabbitMQ tự xoá queue sau 10 phút. Bản gốc vẫn vào `q/vnm/vatm/dev/router/in` như mọi message outbound và nằm chờ Router.
 - Script 4 và 5 tạo subscription tạm trên Solace, chỉ nhận message có correlation-id của lần chạy đó; subscription mất khi script kết thúc.
 
 Message test là message thật: ngoài bản script đọc, các queue khác gắn vào cùng exchange cũng nhận một bản. Bản trong `q/vnm/vatm/dev/router/in` (script 2, 3) sẽ được Router gửi tới các bên trong `APAC_RECIPIENT_LIST` khi Router chạy; script 4 có thể tới các queue khác gắn vào `swim` với key đó. Trên môi trường không phải `dev`, dùng `--recipients` với mã không thuộc đối tác thật.
@@ -360,9 +341,11 @@ Bridge giữ nguyên mọi thứ: payload, mọi header (kể cả `APAC_RECIPIE
 
 - Ngoại lệ duy nhất: B-03 bỏ header `VV_ROUTE` trước khi đưa message lên Solace. Header này chỉ dùng bên trong RabbitMQ: Router đặt nó để headers exchange chọn queue. Ví dụ HVN gửi tới `VV_VATM,WS_CAAS`: bản Router tạo cho VATM có `VV_ROUTE` = `VV_VATM`, còn Solace nhận `APAC_RECIPIENT_LIST` = `VV_VATM,WS_CAAS` nguyên vẹn và không có `VV_ROUTE`.
 - Bridge không ghi `APAC_TIMESTAMP`. Dấu `VV_EEMS_IN` và `VV_EEMS_OUT` do Router ghi (tài liệu v4, Bảng 11, bước 4 và 9).
-- Outbound (B-04): JMS property `contentType` thành `content_type`; JMS property `messageId` (nếu không có thì JMS message id) thành `message_id`; JMS correlation id thành `correlation_id`; JMS ReplyTo thành `reply_to`, tên giữ nguyên; JMS delivery mode thành `delivery_mode`. Trường nào message không có thì bên RabbitMQ cũng không có. Các JMS property khác do người gửi đặt (ví dụ `priority=high`) thành header cùng tên.
-- Inbound (B-03): `content_type` và `message_id` thành JMS property `contentType` và `messageId`; `correlation_id` thành JMS correlation id; `reply_to` thành JMS ReplyTo, tên giữ nguyên: tên bắt đầu `q/` là queue, tên khác là topic. Mỗi header thành một JMS property cùng tên (ví dụ header `x-trace-id` = `abc-1` thành property `x-trace-id` = `abc-1`). Giá trị luôn được gửi dạng chuỗi, nên header số `5` thành chuỗi `"5"`. Message tới Solace luôn là TextMessage (UTF-8) persistent, vì SWIM payload là XML hoặc JSON.
-- NiFi dùng một số tên cho việc riêng, nên chúng không được chuyển: B-04 không gửi header tên `uuid`, `filename`, `path`, `contentType`, `messageId`, `routingKey` hay bắt đầu bằng `jms_`, `JMS`, `Solace_`, `amqp$` (các trường JMS đã nói ở trên đi theo cách riêng); B-03 không chuyển header RabbitMQ có `$` trong tên.
+Tên trường dưới đây là của AMQP 1.0. RabbitMQ UI hiện chúng bằng tên cũ: `content-type` là `content_type`, `message-id` là `message_id`, `durable` là `delivery_mode: 2`, application-properties là `headers`.
+
+- Outbound (B-04): JMS property `contentType` thành `content-type`; JMS property `messageId` (nếu không có thì JMS message id) thành `message-id`; JMS correlation id thành `correlation-id`; JMS ReplyTo thành `reply-to`, tên giữ nguyên; JMS delivery mode PERSISTENT thành `durable`. Trường nào message không có thì bên RabbitMQ cũng không có. Các JMS property khác do người gửi đặt (ví dụ `priority=high`) thành application-property cùng tên. Payload đi trong một phần `data`, từng byte.
+- Inbound (B-03): `content-type` và `message-id` thành JMS property `contentType` và `messageId`; `correlation-id` thành JMS correlation id; `reply-to` thành JMS ReplyTo, tên giữ nguyên: tên bắt đầu `q/` là queue, tên khác là topic. Mỗi application-property thành một JMS property cùng tên (ví dụ `x-trace-id` = `abc-1` thành property `x-trace-id` = `abc-1`). Giá trị luôn được gửi dạng chuỗi, nên giá trị số `5` thành chuỗi `"5"`. Payload là phần `data`, hoặc phần `amqp-value` chứa chuỗi (cách client JMS gửi TextMessage qua AMQP 1.0). Message có payload khác (map, list) không được gửi lên Solace: nó nằm, dưới dạng chữ, ở funnel cạnh `B-03 Consume RabbitMQ ...`, xem [Vận hành](#vận-hành). Message tới Solace luôn là TextMessage (UTF-8) persistent, vì SWIM payload là XML hoặc JSON.
+- NiFi dùng một số tên cho việc riêng, nên chúng không được chuyển: B-04 không gửi header tên `uuid`, `filename`, `path`, `contentType`, `messageId`, `routingKey` hay bắt đầu bằng `jms_`, `JMS`, `Solace_`, `amqp$` (các trường JMS đã nói ở trên đi theo cách riêng); B-03 không chuyển application-property có `$` trong tên. Message annotation của AMQP 1.0 (ví dụ `x-routing-key`) không phải header, nên không được chuyển.
 
 ## Thêm bên nhận
 
@@ -401,7 +384,9 @@ podman run ... docker.io/apache/nifi:<phiên bản mới>
 
 Message không tới bên nhận trên RabbitMQ: Bridge chỉ đưa message tới `x/vnm/vatm/dev/ingress`. Khi Router chưa chạy, message nằm chờ ở `q/vnm/vatm/dev/router/in`; khi Router chạy, xem phía RabbitMQ: `q/vnm/vatm/dev/eems/unrouted` (không khớp binding nào) và `q/vnm/vatm/dev/eems/dlq` (Router không định tuyến được, lý do ở header `VV_DLX_REASON`).
 
-Khi một broker không nhận (mất kết nối, exchange bị xoá...), processor gửi đi thử lại, ghi lỗi vào log và hiện ô đỏ. Message không mất: ở B-04 nó chờ ở connection `failure` vòng quanh `PublishAMQP`; ở B-03 nó chờ ở connection trước `B-03 Publish to Solace ...`, hoặc ở connection `failure` vòng quanh processor đó nếu chính message có lỗi. Sửa nguyên nhân thì message đi tiếp; nếu message không cần nữa: chuột phải vào connection vòng đó → **List Queue** để xem, rồi **Empty Queue** để bỏ.
+Khi một broker không nhận (mất kết nối, exchange bị xoá, không queue nào bind với exchange đó...), processor gửi đi thử lại, ghi lỗi vào log và hiện ô đỏ. Message không mất: ở B-04 nó chờ ở connection `failure` vòng quanh `B-04 Publish to RabbitMQ ...`; ở B-03 nó chờ ở connection trước `B-03 Publish to Solace ...`, hoặc ở connection `failure` vòng quanh processor đó nếu chính message có lỗi. Sửa nguyên nhân thì message đi tiếp; nếu message không cần nữa: chuột phải vào connection vòng đó → **List Queue** để xem, rồi **Empty Queue** để bỏ.
+
+Message trên `q/vnm/vatm/dev/bridge/inbound` có payload là map hay list (không phải byte hay chuỗi) không lên được Solace. B-03 vẫn lấy nó khỏi RabbitMQ, ghi lỗi, và giữ nó (header, và payload viết thành chữ) ở connection `B-03 body is not bytes or text: kept here, see the bulletin` (tới funnel cạnh `B-03 Consume RabbitMQ ...`). Xem bằng **List Queue**, báo bên gửi, rồi **Empty Queue**.
 
 Gỡ hẳn Bridge (mất flow và các message đang chờ trong NiFi):
 

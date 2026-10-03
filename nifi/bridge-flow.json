@@ -1270,148 +1270,88 @@
           {
             "identifier": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
             "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0",
-            "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
+            "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would (AMQP 1.0)",
             "comments": "",
             "position": {
               "x": 1000.0,
               "y": 250.0
             },
-            "type": "org.apache.nifi.amqp.processors.PublishAMQP",
+            "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
             "bundle": {
               "group": "org.apache.nifi",
-              "artifact": "nifi-amqp-nar",
+              "artifact": "nifi-groovyx-nar",
               "version": "2.12.0"
             },
             "properties": {
-              "Routing Key": "${routingKey}",
-              "Exchange Name": "x/vnm/vatm/dev/route",
-              "Port": "#{rabbitmq.port}",
-              "Maximum Input FlowFile Size": "128 MB",
-              "Brokers": null,
-              "Host Name": "#{rabbitmq.host}",
-              "Headers Pattern": "(?!(uuid|filename|path|routingKey)$|amqp\\$).*",
-              "SSL Context Service": null,
-              "Delivery Guarantee": "AT_LEAST_ONCE",
-              "Header Separator": ",",
-              "AMQP Version": "0.9.1",
-              "Virtual Host": "#{rabbitmq.vhost}",
-              "Username": "#{rabbitmq.username}",
-              "Client Certificate Authentication Enabled": "false",
-              "Headers Source": "FLOWFILE_ATTRIBUTES",
-              "Password": "#{rabbitmq.password}"
+              "Script File": null,
+              "Additional Classpath": "/opt/nifi/rabbitmq-lib/*.jar",
+              "Script Body": "// Demo: a Pathfinder message into RabbitMQ, as the Router would send it.\n// Flowfile -> RabbitMQ message over AMQP 1.0, unchanged (ADR 0007; NiFi's PublishAMQP speaks only 0-9-1).\n// Address = exchange + the routingKey attribute. message-id, correlation-id, content-type and reply-to come from the\n// amqp$ attributes, durable from amqp$deliveryMode = 2. Attributes that match headers.pattern become\n// application-properties. A flowfile goes to success only when RabbitMQ accepted its message, else to failure.\nimport com.rabbitmq.client.amqp.Publisher\nimport com.rabbitmq.client.amqp.Resource\nimport com.rabbitmq.client.amqp.impl.AmqpEnvironmentBuilder\nimport groovy.transform.Field\nimport java.util.concurrent.CompletableFuture\nimport java.util.concurrent.TimeUnit\nimport java.util.regex.Pattern\nimport org.apache.nifi.processor.ProcessContext\n\n@Field static final long OUTCOME_SECONDS = 30\n@Field static environment = null\n@Field static publisher = null\n\nstatic synchronized connect(ProcessContext context) {\n    if (publisher?.state() == Resource.State.OPEN) return publisher\n    disconnect()\n    def p = { String name -> context.getProperty(name).getValue() }\n    environment = new AmqpEnvironmentBuilder().build()\n    publisher = environment.connectionBuilder()\n            .host(p('rabbitmq.host')).port(p('rabbitmq.port') as int).virtualHost(p('rabbitmq.vhost'))\n            .username(p('rabbitmq.user')).password(p('rabbitmq.password'))\n            .name(p('connection.name'))                    // shown in the RabbitMQ UI and checked by BridgeTest ping\n            .recovery().activated(false).connectionBuilder() // a broken connection is made again on the next run\n            .build()\n            .publisherBuilder().build()\n    publisher\n}\n\nstatic synchronized void disconnect() {\n    try { environment?.close() } catch (ignored) { }\n    environment = null\n    publisher = null\n}\n\n// Connect at start, not at the first flowfile, so an idle Bridge still shows its connection (BridgeTest ping checks it).\nstatic void onStart(ProcessContext context) {\n    try { connect(context) } catch (e) { disconnect(); throw e }\n}\n\nstatic void onStop(ProcessContext context) { disconnect() }\nstatic void onUnscheduled(ProcessContext context) { disconnect() }\n\ndef toMessage(out, flowFile, String exchange, Pattern headers) {\n    def a = flowFile.getAttributes()\n    if (!a.routingKey) throw new IllegalArgumentException('no routingKey attribute')\n    def message = out.message(session.read(flowFile).withCloseable { it.bytes })\n    message.durable(a['amqp$deliveryMode'] == '2')\n    if (a['amqp$messageId']) message.messageId(a['amqp$messageId'])\n    if (a['amqp$correlationId']) message.correlationId(a['amqp$correlationId'])\n    if (a['amqp$contentType']) message.contentType(a['amqp$contentType'])\n    if (a['amqp$replyTo']) message.replyTo(a['amqp$replyTo'])\n    a.each { k, v -> if (headers.matcher(k).matches()) message.property(k, v) }\n    message.toAddress().exchange(exchange).key(a.routingKey).message()\n}\n\ndef flowFiles = session.get(100)\nif (!flowFiles) return\ndef exchange = context.getProperty('exchange').getValue()\ndef headers = Pattern.compile(context.getProperty('headers.pattern').getValue())\ntry {\n    def out = connect(context)\n    def sent = []\n    flowFiles.each { flowFile ->\n        def message\n        try {\n            message = toMessage(out, flowFile, exchange, headers)\n        } catch (e) {                                     // this message cannot be sent; let the others go on\n            log.error('Cannot make an AMQP message from {}, sent to failure', flowFile, e)\n            session.transfer(session.penalize(flowFile), REL_FAILURE)\n            return\n        }\n        def outcome = new CompletableFuture()\n        out.publish(message, { ctx -> outcome.complete(ctx.status()) } as Publisher.Callback)\n        sent << [flowFile, outcome]\n    }\n    def deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(OUTCOME_SECONDS)\n    sent.each { flowFileAndOutcome ->\n        def (flowFile, outcome) = flowFileAndOutcome\n        def status = outcome.get(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)\n        if (status == Publisher.Status.ACCEPTED) {\n            session.transfer(flowFile, REL_SUCCESS)\n        } else {\n            log.error('RabbitMQ did not accept {} ({}), sent to failure', flowFile, status)\n            session.transfer(session.penalize(flowFile), REL_FAILURE)\n        }\n    }\n} catch (e) {\n    disconnect()                                          // no outcome in time or a broken connection: all tried again\n    throw e\n}\n",
+              "Failure Strategy": "rollback",
+              "rabbitmq.host": "#{rabbitmq.host}",
+              "rabbitmq.port": "#{rabbitmq.port}",
+              "rabbitmq.vhost": "#{rabbitmq.vhost}",
+              "rabbitmq.user": "#{rabbitmq.username}",
+              "rabbitmq.password": "#{rabbitmq.password}",
+              "exchange": "x/vnm/vatm/dev/route",
+              "connection.name": "vatm-bridge demo sender",
+              "headers.pattern": "(?!(uuid|filename|path|routingKey)$|amqp\\$).*"
             },
             "propertyDescriptors": {
-              "Routing Key": {
-                "name": "Routing Key",
-                "displayName": "Routing Key",
+              "rabbitmq.host": {
+                "name": "rabbitmq.host",
+                "displayName": "rabbitmq.host",
                 "identifiesControllerService": false,
                 "sensitive": false,
-                "dynamic": false
+                "dynamic": true
               },
-              "Exchange Name": {
-                "name": "Exchange Name",
-                "displayName": "Exchange Name",
+              "rabbitmq.port": {
+                "name": "rabbitmq.port",
+                "displayName": "rabbitmq.port",
                 "identifiesControllerService": false,
                 "sensitive": false,
-                "dynamic": false
+                "dynamic": true
               },
-              "Port": {
-                "name": "Port",
-                "displayName": "Port",
+              "rabbitmq.vhost": {
+                "name": "rabbitmq.vhost",
+                "displayName": "rabbitmq.vhost",
                 "identifiesControllerService": false,
                 "sensitive": false,
-                "dynamic": false
+                "dynamic": true
               },
-              "Maximum Input FlowFile Size": {
-                "name": "Maximum Input FlowFile Size",
-                "displayName": "Maximum Input FlowFile Size",
+              "rabbitmq.user": {
+                "name": "rabbitmq.user",
+                "displayName": "rabbitmq.user",
                 "identifiesControllerService": false,
                 "sensitive": false,
-                "dynamic": false
+                "dynamic": true
               },
-              "Brokers": {
-                "name": "Brokers",
-                "displayName": "Brokers",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Host Name": {
-                "name": "Host Name",
-                "displayName": "Host Name",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Headers Pattern": {
-                "name": "Headers Pattern",
-                "displayName": "Headers Pattern",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "SSL Context Service": {
-                "name": "SSL Context Service",
-                "displayName": "SSL Context Service",
-                "identifiesControllerService": true,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Delivery Guarantee": {
-                "name": "Delivery Guarantee",
-                "displayName": "Delivery Guarantee",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Header Separator": {
-                "name": "Header Separator",
-                "displayName": "Header Separator",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "AMQP Version": {
-                "name": "AMQP Version",
-                "displayName": "AMQP Version",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Virtual Host": {
-                "name": "Virtual Host",
-                "displayName": "Virtual Host",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Username": {
-                "name": "Username",
-                "displayName": "Username",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Client Certificate Authentication Enabled": {
-                "name": "Client Certificate Authentication Enabled",
-                "displayName": "Client Certificate Authentication Enabled",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Headers Source": {
-                "name": "Headers Source",
-                "displayName": "Headers Source",
-                "identifiesControllerService": false,
-                "sensitive": false,
-                "dynamic": false
-              },
-              "Password": {
-                "name": "Password",
-                "displayName": "Password",
+              "rabbitmq.password": {
+                "name": "rabbitmq.password",
+                "displayName": "rabbitmq.password",
                 "identifiesControllerService": false,
                 "sensitive": true,
-                "dynamic": false
+                "dynamic": true
+              },
+              "exchange": {
+                "name": "exchange",
+                "displayName": "exchange",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "connection.name": {
+                "name": "connection.name",
+                "displayName": "connection.name",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "headers.pattern": {
+                "name": "headers.pattern",
+                "displayName": "headers.pattern",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
               }
             },
             "style": {},
@@ -1452,7 +1392,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would (AMQP 1.0)",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1514,7 +1454,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would (AMQP 1.0)",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1654,7 +1594,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would (AMQP 1.0)",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1662,7 +1602,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would (AMQP 1.0)",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -2046,148 +1986,88 @@
       {
         "identifier": "732982c2-1f68-3c7e-94dd-7b1b45666716",
         "instanceIdentifier": "fc24a569-01a0-1000-6a12-08985186f724",
-        "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress",
+        "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress (AMQP 1.0)",
         "comments": "",
         "position": {
           "x": 0.0,
           "y": 500.0
         },
-        "type": "org.apache.nifi.amqp.processors.PublishAMQP",
+        "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
         "bundle": {
           "group": "org.apache.nifi",
-          "artifact": "nifi-amqp-nar",
+          "artifact": "nifi-groovyx-nar",
           "version": "2.12.0"
         },
         "properties": {
-          "Routing Key": "${routingKey}",
-          "Exchange Name": "x/vnm/vatm/dev/ingress",
-          "Port": "#{rabbitmq.port}",
-          "Maximum Input FlowFile Size": "128 MB",
-          "Brokers": null,
-          "Host Name": "#{rabbitmq.host}",
-          "Headers Pattern": "(?!(uuid|filename|path|contentType|messageId|routingKey)$|jms[._]|JMS|Solace_|amqp\\$).*",
-          "SSL Context Service": null,
-          "Delivery Guarantee": "AT_LEAST_ONCE",
-          "Header Separator": ",",
-          "AMQP Version": "0.9.1",
-          "Virtual Host": "#{rabbitmq.vhost}",
-          "Username": "#{rabbitmq.username}",
-          "Client Certificate Authentication Enabled": "false",
-          "Headers Source": "FLOWFILE_ATTRIBUTES",
-          "Password": "#{rabbitmq.password}"
+          "Script File": null,
+          "Additional Classpath": "/opt/nifi/rabbitmq-lib/*.jar",
+          "Script Body": "// B-04: Solace -> RabbitMQ.\n// Flowfile -> RabbitMQ message over AMQP 1.0, unchanged (ADR 0007; NiFi's PublishAMQP speaks only 0-9-1).\n// Address = exchange + the routingKey attribute. message-id, correlation-id, content-type and reply-to come from the\n// amqp$ attributes, durable from amqp$deliveryMode = 2. Attributes that match headers.pattern become\n// application-properties. A flowfile goes to success only when RabbitMQ accepted its message, else to failure.\nimport com.rabbitmq.client.amqp.Publisher\nimport com.rabbitmq.client.amqp.Resource\nimport com.rabbitmq.client.amqp.impl.AmqpEnvironmentBuilder\nimport groovy.transform.Field\nimport java.util.concurrent.CompletableFuture\nimport java.util.concurrent.TimeUnit\nimport java.util.regex.Pattern\nimport org.apache.nifi.processor.ProcessContext\n\n@Field static final long OUTCOME_SECONDS = 30\n@Field static environment = null\n@Field static publisher = null\n\nstatic synchronized connect(ProcessContext context) {\n    if (publisher?.state() == Resource.State.OPEN) return publisher\n    disconnect()\n    def p = { String name -> context.getProperty(name).getValue() }\n    environment = new AmqpEnvironmentBuilder().build()\n    publisher = environment.connectionBuilder()\n            .host(p('rabbitmq.host')).port(p('rabbitmq.port') as int).virtualHost(p('rabbitmq.vhost'))\n            .username(p('rabbitmq.user')).password(p('rabbitmq.password'))\n            .name(p('connection.name'))                    // shown in the RabbitMQ UI and checked by BridgeTest ping\n            .recovery().activated(false).connectionBuilder() // a broken connection is made again on the next run\n            .build()\n            .publisherBuilder().build()\n    publisher\n}\n\nstatic synchronized void disconnect() {\n    try { environment?.close() } catch (ignored) { }\n    environment = null\n    publisher = null\n}\n\n// Connect at start, not at the first flowfile, so an idle Bridge still shows its connection (BridgeTest ping checks it).\nstatic void onStart(ProcessContext context) {\n    try { connect(context) } catch (e) { disconnect(); throw e }\n}\n\nstatic void onStop(ProcessContext context) { disconnect() }\nstatic void onUnscheduled(ProcessContext context) { disconnect() }\n\ndef toMessage(out, flowFile, String exchange, Pattern headers) {\n    def a = flowFile.getAttributes()\n    if (!a.routingKey) throw new IllegalArgumentException('no routingKey attribute')\n    def message = out.message(session.read(flowFile).withCloseable { it.bytes })\n    message.durable(a['amqp$deliveryMode'] == '2')\n    if (a['amqp$messageId']) message.messageId(a['amqp$messageId'])\n    if (a['amqp$correlationId']) message.correlationId(a['amqp$correlationId'])\n    if (a['amqp$contentType']) message.contentType(a['amqp$contentType'])\n    if (a['amqp$replyTo']) message.replyTo(a['amqp$replyTo'])\n    a.each { k, v -> if (headers.matcher(k).matches()) message.property(k, v) }\n    message.toAddress().exchange(exchange).key(a.routingKey).message()\n}\n\ndef flowFiles = session.get(100)\nif (!flowFiles) return\ndef exchange = context.getProperty('exchange').getValue()\ndef headers = Pattern.compile(context.getProperty('headers.pattern').getValue())\ntry {\n    def out = connect(context)\n    def sent = []\n    flowFiles.each { flowFile ->\n        def message\n        try {\n            message = toMessage(out, flowFile, exchange, headers)\n        } catch (e) {                                     // this message cannot be sent; let the others go on\n            log.error('Cannot make an AMQP message from {}, sent to failure', flowFile, e)\n            session.transfer(session.penalize(flowFile), REL_FAILURE)\n            return\n        }\n        def outcome = new CompletableFuture()\n        out.publish(message, { ctx -> outcome.complete(ctx.status()) } as Publisher.Callback)\n        sent << [flowFile, outcome]\n    }\n    def deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(OUTCOME_SECONDS)\n    sent.each { flowFileAndOutcome ->\n        def (flowFile, outcome) = flowFileAndOutcome\n        def status = outcome.get(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)\n        if (status == Publisher.Status.ACCEPTED) {\n            session.transfer(flowFile, REL_SUCCESS)\n        } else {\n            log.error('RabbitMQ did not accept {} ({}), sent to failure', flowFile, status)\n            session.transfer(session.penalize(flowFile), REL_FAILURE)\n        }\n    }\n} catch (e) {\n    disconnect()                                          // no outcome in time or a broken connection: all tried again\n    throw e\n}\n",
+          "Failure Strategy": "rollback",
+          "rabbitmq.host": "#{rabbitmq.host}",
+          "rabbitmq.port": "#{rabbitmq.port}",
+          "rabbitmq.vhost": "#{rabbitmq.vhost}",
+          "rabbitmq.user": "#{rabbitmq.username}",
+          "rabbitmq.password": "#{rabbitmq.password}",
+          "exchange": "x/vnm/vatm/dev/ingress",
+          "connection.name": "vatm-bridge B-04",
+          "headers.pattern": "(?!(uuid|filename|path|contentType|messageId|routingKey)$|jms[._]|JMS|Solace_|amqp\\$).*"
         },
         "propertyDescriptors": {
-          "Routing Key": {
-            "name": "Routing Key",
-            "displayName": "Routing Key",
+          "rabbitmq.host": {
+            "name": "rabbitmq.host",
+            "displayName": "rabbitmq.host",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Exchange Name": {
-            "name": "Exchange Name",
-            "displayName": "Exchange Name",
+          "rabbitmq.port": {
+            "name": "rabbitmq.port",
+            "displayName": "rabbitmq.port",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Port": {
-            "name": "Port",
-            "displayName": "Port",
+          "rabbitmq.vhost": {
+            "name": "rabbitmq.vhost",
+            "displayName": "rabbitmq.vhost",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Maximum Input FlowFile Size": {
-            "name": "Maximum Input FlowFile Size",
-            "displayName": "Maximum Input FlowFile Size",
+          "rabbitmq.user": {
+            "name": "rabbitmq.user",
+            "displayName": "rabbitmq.user",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Brokers": {
-            "name": "Brokers",
-            "displayName": "Brokers",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Host Name": {
-            "name": "Host Name",
-            "displayName": "Host Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Headers Pattern": {
-            "name": "Headers Pattern",
-            "displayName": "Headers Pattern",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "SSL Context Service": {
-            "name": "SSL Context Service",
-            "displayName": "SSL Context Service",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Delivery Guarantee": {
-            "name": "Delivery Guarantee",
-            "displayName": "Delivery Guarantee",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Header Separator": {
-            "name": "Header Separator",
-            "displayName": "Header Separator",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "AMQP Version": {
-            "name": "AMQP Version",
-            "displayName": "AMQP Version",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Virtual Host": {
-            "name": "Virtual Host",
-            "displayName": "Virtual Host",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Username": {
-            "name": "Username",
-            "displayName": "Username",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Client Certificate Authentication Enabled": {
-            "name": "Client Certificate Authentication Enabled",
-            "displayName": "Client Certificate Authentication Enabled",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Headers Source": {
-            "name": "Headers Source",
-            "displayName": "Headers Source",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Password": {
-            "name": "Password",
-            "displayName": "Password",
+          "rabbitmq.password": {
+            "name": "rabbitmq.password",
+            "displayName": "rabbitmq.password",
             "identifiesControllerService": false,
             "sensitive": true,
-            "dynamic": false
+            "dynamic": true
+          },
+          "exchange": {
+            "name": "exchange",
+            "displayName": "exchange",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": true
+          },
+          "connection.name": {
+            "name": "connection.name",
+            "displayName": "connection.name",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": true
+          },
+          "headers.pattern": {
+            "name": "headers.pattern",
+            "displayName": "headers.pattern",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": true
           }
         },
         "style": {},
@@ -2213,164 +2093,80 @@
       {
         "identifier": "562a4a4a-35a7-31cd-a93a-cf2fc6f206b2",
         "instanceIdentifier": "4603b6a6-0a67-39ab-2c82-62a2007e23f2",
-        "name": "B-03 Consume RabbitMQ q/vnm/vatm/dev/bridge/inbound",
+        "name": "B-03 Consume RabbitMQ q/vnm/vatm/dev/bridge/inbound (AMQP 1.0)",
         "comments": "",
         "position": {
           "x": 400.0,
           "y": 0.0
         },
-        "type": "org.apache.nifi.amqp.processors.ConsumeAMQP",
+        "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
         "bundle": {
           "group": "org.apache.nifi",
-          "artifact": "nifi-amqp-nar",
+          "artifact": "nifi-groovyx-nar",
           "version": "2.12.0"
         },
         "properties": {
-          "Max Inbound Message Body Size": "64 MB",
-          "Port": "#{rabbitmq.port}",
-          "Brokers": null,
-          "Header Key Prefix": "consume.amqp",
-          "Auto-Acknowledge Messages": "false",
-          "Host Name": "#{rabbitmq.host}",
-          "SSL Context Service": null,
-          "Prefetch Count": "0",
-          "Header Separator": ",",
-          "AMQP Version": "0.9.1",
-          "Header Output Format": "FlowFile Attributes",
-          "Virtual Host": "#{rabbitmq.vhost}",
-          "Username": "#{rabbitmq.username}",
-          "Client Certificate Authentication Enabled": "false",
-          "Remove Curly Braces": "True",
-          "Batch Size": "10",
-          "Queue": "q/vnm/vatm/dev/bridge/inbound",
-          "Password": "#{rabbitmq.password}"
+          "Script File": null,
+          "Additional Classpath": "/opt/nifi/rabbitmq-lib/*.jar",
+          "Script Body": "// B-03: RabbitMQ -> Solace.\n// RabbitMQ queue -> flowfiles over AMQP 1.0, unchanged (ADR 0007; NiFi's ConsumeAMQP speaks only 0-9-1).\n// Writes the attributes ConsumeAMQP wrote, so the next step is unchanged: consume.amqp.<name> per\n// application-property, amqp$routingKey from the x-routing-key annotation, amqp$messageId, amqp$correlationId,\n// amqp$contentType and amqp$replyTo. Content = the body bytes. A message is accepted on RabbitMQ only after NiFi\n// has stored its flowfile; if that fails, or the connection drops first, RabbitMQ delivers it again.\nimport com.rabbitmq.client.amqp.Consumer\nimport com.rabbitmq.client.amqp.Message\nimport com.rabbitmq.client.amqp.Resource\nimport com.rabbitmq.client.amqp.impl.AmqpEnvironmentBuilder\nimport groovy.transform.Field\nimport java.util.concurrent.LinkedBlockingQueue\nimport org.apache.nifi.processor.ProcessContext\nimport org.apache.nifi.processor.io.OutputStreamCallback\n\n@Field static final String PREFIX = 'consume.amqp.'\n@Field static final int CREDITS = 100                     // messages RabbitMQ may hand over before NiFi stored them\n@Field static final LinkedBlockingQueue inbox = new LinkedBlockingQueue()\n@Field static environment = null\n@Field static consumer = null\n\nstatic synchronized void connect(ProcessContext context) {\n    if (consumer?.state() == Resource.State.OPEN) return\n    disconnect()\n    def p = { String name -> context.getProperty(name).getValue() }\n    environment = new AmqpEnvironmentBuilder().build()\n    consumer = environment.connectionBuilder()\n            .host(p('rabbitmq.host')).port(p('rabbitmq.port') as int).virtualHost(p('rabbitmq.vhost'))\n            .username(p('rabbitmq.user')).password(p('rabbitmq.password'))\n            .name(p('connection.name'))                    // shown in the RabbitMQ UI and checked by BridgeTest ping\n            .recovery().activated(false).connectionBuilder() // a broken connection is made again on the next run\n            .build()\n            .consumerBuilder().queue(p('queue')).initialCredits(CREDITS)\n            .messageHandler({ ctx, message -> inbox.put([ctx, message]) } as Consumer.MessageHandler)\n            .build()\n}\n\nstatic synchronized void disconnect() {\n    try { environment?.close() } catch (ignored) { }\n    environment = null\n    consumer = null\n    inbox.clear()                                         // never accepted, so RabbitMQ delivers them again\n}\n\nstatic void onStop(ProcessContext context) { disconnect() }\nstatic void onUnscheduled(ProcessContext context) { disconnect() }\n\nstatic void settle(List received, boolean accept, logger) {\n    received.each { ctxAndMessage ->\n        try {\n            accept ? ctxAndMessage[0].accept() : ctxAndMessage[0].requeue()\n        } catch (e) {                                     // the connection dropped: RabbitMQ delivers it again\n            logger.warn('Cannot {} a RabbitMQ message, it will be delivered again', accept ? 'accept' : 'requeue', e)\n        }\n    }\n}\n\ndef toFlowFile(message) {\n    def a = [:]\n    message.forEachProperty { k, v -> if (v != null) a[PREFIX + k] = v.toString() }\n    [\n        'amqp$routingKey'   : message.annotation('x-routing-key'),\n        'amqp$messageId'    : message.messageId(),\n        'amqp$correlationId': message.correlationId(),\n        'amqp$contentType'  : message.contentType(),\n        'amqp$replyTo'      : message.replyTo(),\n    ].each { k, v -> if (v != null) a[k] = v.toString() }\n    def flowFile = session.putAllAttributes(session.create(), a)\n    def relationship = REL_SUCCESS\n    byte[] body\n    try {\n        body = message.body() ?: new byte[0]\n    } catch (e) {                                         // a map or list body: kept in NiFi as text, not sent to Solace\n        log.error('RabbitMQ message {} has no byte or text body, sent to failure', a['amqp$messageId'], e)\n        body = String.valueOf(message.body({ it } as Message.Converter)).getBytes('UTF-8')\n        relationship = REL_FAILURE\n    }\n    session.transfer(session.write(flowFile, { out -> out.write(body) } as OutputStreamCallback), relationship)\n}\n\ntry {\n    connect(context)\n} catch (e) {\n    disconnect()\n    context.yield()\n    throw e\n}\ndef received = []\ninbox.drainTo(received, CREDITS)\nif (!received) {\n    context.yield()\n    return\n}\ndef logger = log                                          // the script's bindings are cleared before the commit ends\ntry {\n    received.each { toFlowFile(it[1]) }\n} catch (e) {\n    settle(received, false, logger)                       // RabbitMQ delivers them again at once, so wait first\n    context.yield()\n    throw e\n}\nsession.commitAsync({ settle(received, true, logger) } as Runnable,\n        { failure -> settle(received, false, logger) } as java.util.function.Consumer)\n",
+          "Failure Strategy": "rollback",
+          "rabbitmq.host": "#{rabbitmq.host}",
+          "rabbitmq.port": "#{rabbitmq.port}",
+          "rabbitmq.vhost": "#{rabbitmq.vhost}",
+          "rabbitmq.user": "#{rabbitmq.username}",
+          "rabbitmq.password": "#{rabbitmq.password}",
+          "queue": "q/vnm/vatm/dev/bridge/inbound",
+          "connection.name": "vatm-bridge B-03"
         },
         "propertyDescriptors": {
-          "Max Inbound Message Body Size": {
-            "name": "Max Inbound Message Body Size",
-            "displayName": "Max Inbound Message Body Size",
+          "rabbitmq.host": {
+            "name": "rabbitmq.host",
+            "displayName": "rabbitmq.host",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Port": {
-            "name": "Port",
-            "displayName": "Port",
+          "rabbitmq.port": {
+            "name": "rabbitmq.port",
+            "displayName": "rabbitmq.port",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Brokers": {
-            "name": "Brokers",
-            "displayName": "Brokers",
+          "rabbitmq.vhost": {
+            "name": "rabbitmq.vhost",
+            "displayName": "rabbitmq.vhost",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Header Key Prefix": {
-            "name": "Header Key Prefix",
-            "displayName": "Header Key Prefix",
+          "rabbitmq.user": {
+            "name": "rabbitmq.user",
+            "displayName": "rabbitmq.user",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Auto-Acknowledge Messages": {
-            "name": "Auto-Acknowledge Messages",
-            "displayName": "Auto-Acknowledge Messages",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Host Name": {
-            "name": "Host Name",
-            "displayName": "Host Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "SSL Context Service": {
-            "name": "SSL Context Service",
-            "displayName": "SSL Context Service",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Prefetch Count": {
-            "name": "Prefetch Count",
-            "displayName": "Prefetch Count",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Header Separator": {
-            "name": "Header Separator",
-            "displayName": "Header Separator",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "AMQP Version": {
-            "name": "AMQP Version",
-            "displayName": "AMQP Version",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Header Output Format": {
-            "name": "Header Output Format",
-            "displayName": "Header Output Format",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Virtual Host": {
-            "name": "Virtual Host",
-            "displayName": "Virtual Host",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Username": {
-            "name": "Username",
-            "displayName": "Username",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Client Certificate Authentication Enabled": {
-            "name": "Client Certificate Authentication Enabled",
-            "displayName": "Client Certificate Authentication Enabled",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Remove Curly Braces": {
-            "name": "Remove Curly Braces",
-            "displayName": "Remove Curly Braces",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Batch Size": {
-            "name": "Batch Size",
-            "displayName": "Batch Size",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Queue": {
-            "name": "Queue",
-            "displayName": "Queue",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Password": {
-            "name": "Password",
-            "displayName": "Password",
+          "rabbitmq.password": {
+            "name": "rabbitmq.password",
+            "displayName": "rabbitmq.password",
             "identifiesControllerService": false,
             "sensitive": true,
-            "dynamic": false
+            "dynamic": true
+          },
+          "queue": {
+            "name": "queue",
+            "displayName": "queue",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": true
+          },
+          "connection.name": {
+            "name": "connection.name",
+            "displayName": "connection.name",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": true
           }
         },
         "style": {},
@@ -2578,7 +2374,7 @@
           "id": "732982c2-1f68-3c7e-94dd-7b1b45666716",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress",
+          "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress (AMQP 1.0)",
           "comments": "",
           "instanceIdentifier": "fc24a569-01a0-1000-6a12-08985186f724"
         },
@@ -2586,7 +2382,7 @@
           "id": "732982c2-1f68-3c7e-94dd-7b1b45666716",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress",
+          "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress (AMQP 1.0)",
           "comments": "",
           "instanceIdentifier": "fc24a569-01a0-1000-6a12-08985186f724"
         },
@@ -2646,7 +2442,7 @@
           "id": "562a4a4a-35a7-31cd-a93a-cf2fc6f206b2",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 Consume RabbitMQ q/vnm/vatm/dev/bridge/inbound",
+          "name": "B-03 Consume RabbitMQ q/vnm/vatm/dev/bridge/inbound (AMQP 1.0)",
           "comments": "",
           "instanceIdentifier": "4603b6a6-0a67-39ab-2c82-62a2007e23f2"
         },
@@ -2722,7 +2518,7 @@
           "id": "732982c2-1f68-3c7e-94dd-7b1b45666716",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress",
+          "name": "B-04 Publish to RabbitMQ x/vnm/vatm/dev/ingress (AMQP 1.0)",
           "comments": "",
           "instanceIdentifier": "fc24a569-01a0-1000-6a12-08985186f724"
         },
@@ -2774,10 +2570,56 @@
         "loadBalanceCompression": "DO_NOT_COMPRESS",
         "componentType": "CONNECTION",
         "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
+      },
+      {
+        "identifier": "133b7f08-426e-5b56-9923-77f2ce947a58",
+        "instanceIdentifier": "5611ad01-0d61-4ab6-aecd-fe3977af0474",
+        "name": "B-03 body is not bytes or text: kept here, see the bulletin",
+        "source": {
+          "id": "562a4a4a-35a7-31cd-a93a-cf2fc6f206b2",
+          "type": "PROCESSOR",
+          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
+          "name": "B-03 Consume RabbitMQ q/vnm/vatm/dev/bridge/inbound (AMQP 1.0)",
+          "comments": "",
+          "instanceIdentifier": "4603b6a6-0a67-39ab-2c82-62a2007e23f2"
+        },
+        "destination": {
+          "id": "f3f1a51c-fc8b-5de1-831d-a35224c2fb36",
+          "type": "FUNNEL",
+          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
+          "name": "Funnel",
+          "comments": "",
+          "instanceIdentifier": "f71ffaed-044b-44c7-a5b7-2ecdf638115f"
+        },
+        "labelIndex": 1,
+        "zIndex": 0,
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "loadBalanceCompression": "DO_NOT_COMPRESS",
+        "componentType": "CONNECTION",
+        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
       }
     ],
     "labels": [],
-    "funnels": [],
+    "funnels": [
+      {
+        "identifier": "f3f1a51c-fc8b-5de1-831d-a35224c2fb36",
+        "instanceIdentifier": "f71ffaed-044b-44c7-a5b7-2ecdf638115f",
+        "position": {
+          "x": 850.0,
+          "y": 50.0
+        },
+        "componentType": "FUNNEL",
+        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
+      }
+    ],
     "controllerServices": [
       {
         "identifier": "140d353a-59e2-3a4f-9690-3759e28e17f8",
