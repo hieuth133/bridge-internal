@@ -138,6 +138,40 @@ A wrong value is printed as `FAIL`, followed by the value that was expected.
 | `FAIL nothing arrived ...` | 1 | Nothing arrived within 30 seconds. The line says what to check: whether the Bridge is running, whether the topic or key reaches the Bridge's queue, and whether VATM is in the list. |
 | `FAIL Solace: ...`, `FAIL RabbitMQ ...`, `... is not set` | 2 | The test could not run: a wrong password, a broker that cannot be reached, or a missing `source tests/env.sh`. |
 
+## What you see in the admin UIs
+
+The script's own output is the proof. You can also watch the message pass in the two admin UIs:
+- **Solace Broker Manager** at `http://<solace host>:18080`, Message VPN `default`;
+- **RabbitMQ management** at `http://192.168.121.61:15672`, vhost `swim_sg`.
+
+Write down the numbers below **before** you run a script, then compare them after.
+
+The two UIs count differently:
+- **Solace** keeps a running total of the messages each queue has received (on the queue's **Stats** tab; the SEMP field is `spooledMsgCount`). One test adds exactly **1**.
+- **RabbitMQ** shows only what is waiting in a queue now (**Ready**, **Total**) and how fast messages move (the **Message rates** charts). It keeps no running total. A message that the Bridge takes straight away shows as a short bump in the chart, not as a +1. The page refreshes every 5 seconds.
+
+### Scripts 2 and 3 (Solace → RabbitMQ)
+
+| Where | What changes |
+|---|---|
+| Solace: **Queues** → `q/vnm/vatm/dev/bridge/outbound` → **Stats** | Total messages spooled **+1**. **Messages Queued** goes back to 0 within a second, because NiFi (B-04) takes the message straight away. If it stays at 1 or more, the Bridge is not reading. |
+| Solace: **Queues** → **Topic Endpoints** tab → `q/vnm/vatm/dev/bridge/out-atfm` | **Script 2 only:** **+1**, and the message **stays** there. This is the old Bridge's endpoint (see the note below). Script 3 does not touch it. |
+| RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/router/in` | **Ready +1**, and it **stays**. This is the original copy, waiting for the Router. To see it: **Get messages**, Ack Mode `Nack message requeue true`; its `correlation_id` is the `bridge-test-...` value the script printed. |
+| RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/bridge-test/bridge-test-...` | The script's temporary queue (feature `Exp`). It exists only for the few seconds the script runs, so you may not catch it. Afterwards it is gone. |
+| RabbitMQ: **Exchanges** → `x/vnm/vatm/dev/ingress` | A short bump in **Message rates** in and out. |
+
+### Scripts 4 and 5 (RabbitMQ → Solace)
+
+| Where | What changes |
+|---|---|
+| RabbitMQ: **Exchanges** → `x/vnm/vatm/dev/swim` (script 4) or `x/vnm/vatm/dev/route` (script 5) | A short bump in **Message rates** in and out. |
+| RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/bridge/inbound` | **Ready** stays 0, because NiFi (B-03) takes the message straight away. **Message rates** shows a short bump in *Publish*, *Deliver* and *Ack*. If **Ready** stays at 1 or more, the Bridge is not reading. Today no other queue gets these two messages. |
+| RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/eems/unrouted` | **No change.** If **Ready** goes up, the key (script 4) or the headers (script 5) matched no binding, so the message never reached the Bridge. |
+| Solace: **Queues** → **Topic Endpoints** tab | While the script waits (a few seconds), a temporary endpoint appears. It has a long generated name that contains the topic, for example `t/vnm/acv/dev/aodb/v1/departure/publish/vvts`, and it receives 1 message. It disappears when the script ends. |
+| Solace: **Queues** | **No change.** No durable queue on Solace subscribes to these two topics, so no total goes up. Queue `q/vnm/vna/dev/swim/reply` is only the reply-to *name* in script 5; nothing is sent to it. |
+
+**Note on `out-atfm`:** the old Bridge's Topic Endpoint `q/vnm/vatm/dev/bridge/out-atfm` subscribes to `t/vnm/vatm/dev/atfm/>` and has no consumer. Every run of script 2 therefore leaves one more message there, and so does every `atfm` message anyone sends. The root `README.md` ("Object cũ") explains how to delete it once it is no longer needed.
+
 ## Options
 
 | Option | Scripts | What it does |
@@ -172,7 +206,8 @@ Each run uses its own correlation-id, `bridge-test-<time>`, so it only ever pick
 
 **The test messages are real messages.** Other queues on the same exchange also get a copy:
 - After scripts 2 and 3, a copy stays in `q/vnm/vatm/dev/router/in`. When the Router runs, it delivers that copy to the parties in `APAC_RECIPIENT_LIST`.
-- Script 4 can reach other queues bound to `swim` with the same key.
+- Script 2 also leaves a copy in the old Solace Topic Endpoint `q/vnm/vatm/dev/bridge/out-atfm`.
+- Scripts 4 and 5 reach only `q/vnm/vatm/dev/bridge/inbound` today. If someone later binds another queue to `swim` or `route` that matches, that queue gets a copy too.
 
 Outside the `dev` environment, use `--recipients` with codes that are not real partners.
 
