@@ -60,7 +60,8 @@
               "Character Set": "UTF-8",
               "Data Format": "Text",
               "routingKey": "tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request",
-              "GUFI_NAMESPACE_IDENTIFIER": "FF-ICE"
+              "GUFI_NAMESPACE_IDENTIFIER": "FF-ICE",
+              "VV_ROUTE": "VV_VATM"
             },
             "propertyDescriptors": {
               "ACID": {
@@ -227,6 +228,13 @@
               "GUFI_NAMESPACE_IDENTIFIER": {
                 "name": "GUFI_NAMESPACE_IDENTIFIER",
                 "displayName": "GUFI_NAMESPACE_IDENTIFIER",
+                "identifiesControllerService": false,
+                "sensitive": false,
+                "dynamic": true
+              },
+              "VV_ROUTE": {
+                "name": "VV_ROUTE",
+                "displayName": "VV_ROUTE",
                 "identifiesControllerService": false,
                 "sensitive": false,
                 "dynamic": true
@@ -1262,7 +1270,7 @@
           {
             "identifier": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
             "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0",
-            "name": "RabbitMQ sender: publish x/vnm/vatm/dev/ingress",
+            "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
             "comments": "",
             "position": {
               "x": 1000.0,
@@ -1276,7 +1284,7 @@
             },
             "properties": {
               "Routing Key": "${routingKey}",
-              "Exchange Name": "x/vnm/vatm/dev/ingress",
+              "Exchange Name": "x/vnm/vatm/dev/route",
               "Port": "#{rabbitmq.port}",
               "Maximum Input FlowFile Size": "128 MB",
               "Brokers": null,
@@ -1444,7 +1452,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/ingress",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1506,7 +1514,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/ingress",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1646,7 +1654,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/ingress",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1654,7 +1662,7 @@
               "id": "9aa37fe8-2629-3d71-ae6a-ce43ae4e4c46",
               "type": "PROCESSOR",
               "groupId": "1bb88b7e-d384-3418-9b0d-8bf0cfa85099",
-              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/ingress",
+              "name": "RabbitMQ sender: publish x/vnm/vatm/dev/route, as the Router would",
               "comments": "",
               "instanceIdentifier": "f9dbefc1-01a0-1000-6dd3-cddb793e60f0"
             },
@@ -1759,187 +1767,6 @@
     ],
     "remoteProcessGroups": [],
     "processors": [
-      {
-        "identifier": "729c4232-bbc6-3b9c-ab8a-9973dbefc5a2",
-        "instanceIdentifier": "fc24a5e5-01a0-1000-9a07-bdaf84151599",
-        "name": "Router Consume RabbitMQ q/vnm/vatm/dev/router/in",
-        "comments": "",
-        "position": {
-          "x": 400.0,
-          "y": 0.0
-        },
-        "type": "org.apache.nifi.amqp.processors.ConsumeAMQP",
-        "bundle": {
-          "group": "org.apache.nifi",
-          "artifact": "nifi-amqp-nar",
-          "version": "2.12.0"
-        },
-        "properties": {
-          "Max Inbound Message Body Size": "64 MB",
-          "Port": "#{rabbitmq.port}",
-          "Brokers": null,
-          "Header Key Prefix": "consume.amqp",
-          "Auto-Acknowledge Messages": "false",
-          "Host Name": "#{rabbitmq.host}",
-          "SSL Context Service": null,
-          "Prefetch Count": "0",
-          "Header Separator": ",",
-          "AMQP Version": "0.9.1",
-          "Header Output Format": "FlowFile Attributes",
-          "Virtual Host": "#{rabbitmq.vhost}",
-          "Username": "#{rabbitmq.username}",
-          "Client Certificate Authentication Enabled": "false",
-          "Remove Curly Braces": "False",
-          "Batch Size": "10",
-          "Queue": "q/vnm/vatm/dev/router/in",
-          "Password": "#{rabbitmq.password}"
-        },
-        "propertyDescriptors": {
-          "Max Inbound Message Body Size": {
-            "name": "Max Inbound Message Body Size",
-            "displayName": "Max Inbound Message Body Size",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Port": {
-            "name": "Port",
-            "displayName": "Port",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Brokers": {
-            "name": "Brokers",
-            "displayName": "Brokers",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Header Key Prefix": {
-            "name": "Header Key Prefix",
-            "displayName": "Header Key Prefix",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Auto-Acknowledge Messages": {
-            "name": "Auto-Acknowledge Messages",
-            "displayName": "Auto-Acknowledge Messages",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Host Name": {
-            "name": "Host Name",
-            "displayName": "Host Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "SSL Context Service": {
-            "name": "SSL Context Service",
-            "displayName": "SSL Context Service",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Prefetch Count": {
-            "name": "Prefetch Count",
-            "displayName": "Prefetch Count",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Header Separator": {
-            "name": "Header Separator",
-            "displayName": "Header Separator",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "AMQP Version": {
-            "name": "AMQP Version",
-            "displayName": "AMQP Version",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Header Output Format": {
-            "name": "Header Output Format",
-            "displayName": "Header Output Format",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Virtual Host": {
-            "name": "Virtual Host",
-            "displayName": "Virtual Host",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Username": {
-            "name": "Username",
-            "displayName": "Username",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Client Certificate Authentication Enabled": {
-            "name": "Client Certificate Authentication Enabled",
-            "displayName": "Client Certificate Authentication Enabled",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Remove Curly Braces": {
-            "name": "Remove Curly Braces",
-            "displayName": "Remove Curly Braces",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Batch Size": {
-            "name": "Batch Size",
-            "displayName": "Batch Size",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Queue": {
-            "name": "Queue",
-            "displayName": "Queue",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Password": {
-            "name": "Password",
-            "displayName": "Password",
-            "identifiesControllerService": false,
-            "sensitive": true,
-            "dynamic": false
-          }
-        },
-        "style": {},
-        "schedulingPeriod": "0 sec",
-        "schedulingStrategy": "TIMER_DRIVEN",
-        "executionNode": "ALL",
-        "penaltyDuration": "30 sec",
-        "yieldDuration": "1 sec",
-        "bulletinLevel": "WARN",
-        "runDurationMillis": 0,
-        "concurrentlySchedulableTaskCount": 1,
-        "autoTerminatedRelationships": [],
-        "scheduledState": "ENABLED",
-        "retryCount": 10,
-        "retriedRelationships": [],
-        "backoffMechanism": "PENALIZE_FLOWFILE",
-        "maxBackoffPeriod": "10 mins",
-        "componentType": "PROCESSOR",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
       {
         "identifier": "953b9f04-77a0-3972-a6ec-c306eff77927",
         "instanceIdentifier": "fc24a521-01a0-1000-70db-5eb3f26dbec4",
@@ -2389,7 +2216,7 @@
         "name": "B-03 Consume RabbitMQ q/vnm/vatm/dev/bridge/inbound",
         "comments": "",
         "position": {
-          "x": 800.0,
+          "x": 400.0,
           "y": 0.0
         },
         "type": "org.apache.nifi.amqp.processors.ConsumeAMQP",
@@ -2567,10 +2394,10 @@
       {
         "identifier": "19a19596-c914-3f0d-85ca-6aa13755ec26",
         "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b",
-        "name": "B-03 RabbitMQ headers -> JMS properties",
+        "name": "B-03 Publish to Solace, topic = key with . -> /",
         "comments": "",
         "position": {
-          "x": 800.0,
+          "x": 400.0,
           "y": 250.0
         },
         "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
@@ -2582,8 +2409,11 @@
         "properties": {
           "Script File": null,
           "Additional Classpath": null,
-          "Script Body": "// RabbitMQ header \"consume.amqp.<name>\" -> attribute \"<name>\", so it reaches Solace as JMS property <name>\ndef flowFile = session.get()\nif (!flowFile) return\ndef prefix = 'consume.amqp.'\ndef headers = flowFile.getAttributes().findAll { it.key.startsWith(prefix) }\n// Names with '$' (amqp$routingKey...) belong to NiFi, a header must not overwrite them.\nflowFile = session.putAllAttributes(flowFile, headers.collectEntries { [it.key.substring(prefix.length()), it.value] }.findAll { !it.key.contains('$') })\nflowFile = session.removeAllAttributes(flowFile, headers.keySet())\nsession.transfer(flowFile, REL_SUCCESS)\n",
-          "Failure Strategy": "rollback"
+          "Script Body": "// B-03: RabbitMQ message -> Solace topic, unchanged.\n// Topic = routing key with '.' -> '/'. Every RabbitMQ header becomes a JMS property, except VV_ROUTE,\n// which only exists inside RabbitMQ. message-id and content-type become the properties messageId and\n// contentType, correlation-id and reply-to the JMS fields. A reply-to that starts \"q/\" is a queue, any\n// other a topic; the name is kept. PublishJMS cannot set such a reply-to, so this script publishes itself.\nimport groovy.transform.Field\nimport org.apache.nifi.processor.ProcessContext\n\n@Field static final String PREFIX = 'consume.amqp.'\n@Field static connection = null\n\nstatic synchronized connect(factory, String user, String password) {\n    if (connection == null) connection = factory.createConnection(user, password)\n    connection\n}\n\nstatic synchronized void disconnect() {\n    try { connection?.close() } catch (ignored) { }\n    connection = null\n}\n\nstatic void onStop(ProcessContext context) { disconnect() }\nstatic void onUnscheduled(ProcessContext context) { disconnect() }\n\ndef toJms(jms, flowFile) {\n    def a = flowFile.getAttributes()\n    def message = jms.createTextMessage(session.read(flowFile).withCloseable { it.getText('UTF-8') })\n    a.each { k, v ->\n        def name = k.startsWith(PREFIX) ? k.substring(PREFIX.length()) : null\n        if (name && !name.contains('$') && name != 'VV_ROUTE') message.setStringProperty(name, v)\n    }\n    if (a['amqp$messageId']) message.setStringProperty('messageId', a['amqp$messageId'])\n    if (a['amqp$contentType']) message.setStringProperty('contentType', a['amqp$contentType'])\n    if (a['amqp$correlationId']) message.setJMSCorrelationID(a['amqp$correlationId'])\n    def replyTo = a['amqp$replyTo']\n    if (replyTo) message.setJMSReplyTo(replyTo.startsWith('q/') ? jms.createQueue(replyTo) : jms.createTopic(replyTo))\n    [jms.createTopic(a['amqp$routingKey'].replace('.', '/')), message]\n}\n\ndef flowFiles = session.get(100)\nif (!flowFiles) return\ndef jms = null\ntry {\n    def conn = connect(CTL.jms.getConnectionFactory(),\n            context.getProperty('solace.user').getValue(), context.getProperty('solace.password').getValue())\n    jms = conn.createSession(true, 0)                 // one transaction per batch: all sent or none\n    def producer = jms.createProducer(null)\n    producer.setDeliveryMode(2)                       // PERSISTENT\n    flowFiles.each { flowFile ->\n        def topicAndMessage\n        try {\n            topicAndMessage = toJms(jms, flowFile)\n        } catch (e) {                                 // this message cannot be sent; let the others go on\n            log.error('Cannot make a JMS message from {}, sent to failure', flowFile, e)\n            session.transfer(session.penalize(flowFile), REL_FAILURE)\n            return\n        }\n        producer.send(*topicAndMessage)\n        session.transfer(flowFile, REL_SUCCESS)\n    }\n    jms.commit()\n} catch (e) {\n    disconnect()                                      // a broken connection is made again on the next run\n    throw e\n} finally {\n    try { jms?.close() } catch (ignored) { }\n}\n",
+          "Failure Strategy": "rollback",
+          "CTL.jms": "140d353a-59e2-3a4f-9690-3759e28e17f8",
+          "solace.user": "#{solace.username}",
+          "solace.password": "#{solace.password}"
         },
         "propertyDescriptors": {
           "Script File": {
@@ -2619,272 +2449,27 @@
             "identifiesControllerService": false,
             "sensitive": false,
             "dynamic": false
-          }
-        },
-        "style": {},
-        "schedulingPeriod": "0 sec",
-        "schedulingStrategy": "TIMER_DRIVEN",
-        "executionNode": "ALL",
-        "penaltyDuration": "30 sec",
-        "yieldDuration": "1 sec",
-        "bulletinLevel": "WARN",
-        "runDurationMillis": 0,
-        "concurrentlySchedulableTaskCount": 1,
-        "autoTerminatedRelationships": [],
-        "scheduledState": "ENABLED",
-        "retryCount": 10,
-        "retriedRelationships": [],
-        "backoffMechanism": "PENALIZE_FLOWFILE",
-        "maxBackoffPeriod": "10 mins",
-        "componentType": "PROCESSOR",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "8c9db5d3-a279-37dc-a546-c2acf2caa370",
-        "instanceIdentifier": "37e59fb1-9216-3093-7736-6a88f6815b05",
-        "name": "B-03 RabbitMQ properties -> JMS properties, topic = key with . -> /",
-        "comments": "",
-        "position": {
-          "x": 800.0,
-          "y": 500.0
-        },
-        "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
-        "bundle": {
-          "group": "org.apache.nifi",
-          "artifact": "nifi-update-attribute-nar",
-          "version": "2.12.0"
-        },
-        "properties": {
-          "Delete Attributes Expression": null,
-          "Store State": "Do not store state",
-          "jms_correlationId": "${'amqp$correlationId'}",
-          "messageId": "${'amqp$messageId'}",
-          "topic": "${'amqp$routingKey':replace('.', '/')}",
-          "Cache Value Lookup Cache Size": "100",
-          "Stateful Variables Initial Value": null,
-          "contentType": "${'amqp$contentType'}"
-        },
-        "propertyDescriptors": {
-          "Delete Attributes Expression": {
-            "name": "Delete Attributes Expression",
-            "displayName": "Delete Attributes Expression",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
           },
-          "Store State": {
-            "name": "Store State",
-            "displayName": "Store State",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "jms_correlationId": {
-            "name": "jms_correlationId",
-            "displayName": "jms_correlationId",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "messageId": {
-            "name": "messageId",
-            "displayName": "messageId",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "topic": {
-            "name": "topic",
-            "displayName": "topic",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "Cache Value Lookup Cache Size": {
-            "name": "Cache Value Lookup Cache Size",
-            "displayName": "Cache Value Lookup Cache Size",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Stateful Variables Initial Value": {
-            "name": "Stateful Variables Initial Value",
-            "displayName": "Stateful Variables Initial Value",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "contentType": {
-            "name": "contentType",
-            "displayName": "contentType",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          }
-        },
-        "style": {},
-        "schedulingPeriod": "0 sec",
-        "schedulingStrategy": "TIMER_DRIVEN",
-        "executionNode": "ALL",
-        "penaltyDuration": "30 sec",
-        "yieldDuration": "1 sec",
-        "bulletinLevel": "WARN",
-        "runDurationMillis": 25,
-        "concurrentlySchedulableTaskCount": 1,
-        "autoTerminatedRelationships": [],
-        "scheduledState": "ENABLED",
-        "retryCount": 10,
-        "retriedRelationships": [],
-        "backoffMechanism": "PENALIZE_FLOWFILE",
-        "maxBackoffPeriod": "10 mins",
-        "componentType": "PROCESSOR",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "863008b2-b99e-3a31-baa8-71feed580000",
-        "instanceIdentifier": "fc24a637-01a0-1000-c9c2-fe9190c238df",
-        "name": "Router Publish to RabbitMQ ${exchange}",
-        "comments": "",
-        "position": {
-          "x": 400.0,
-          "y": 500.0
-        },
-        "type": "org.apache.nifi.amqp.processors.PublishAMQP",
-        "bundle": {
-          "group": "org.apache.nifi",
-          "artifact": "nifi-amqp-nar",
-          "version": "2.12.0"
-        },
-        "properties": {
-          "Routing Key": "${routingKey}",
-          "Exchange Name": "${exchange}",
-          "Port": "#{rabbitmq.port}",
-          "Maximum Input FlowFile Size": "128 MB",
-          "Brokers": null,
-          "Host Name": "#{rabbitmq.host}",
-          "Headers Pattern": "(?!(uuid|filename|path|exchange|routingKey)$|amqp\\$).*",
-          "SSL Context Service": null,
-          "Delivery Guarantee": "AT_LEAST_ONCE",
-          "Header Separator": ",",
-          "AMQP Version": "0.9.1",
-          "Virtual Host": "#{rabbitmq.vhost}",
-          "Username": "#{rabbitmq.username}",
-          "Client Certificate Authentication Enabled": "false",
-          "Headers Source": "FLOWFILE_ATTRIBUTES",
-          "Password": "#{rabbitmq.password}"
-        },
-        "propertyDescriptors": {
-          "Routing Key": {
-            "name": "Routing Key",
-            "displayName": "Routing Key",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Exchange Name": {
-            "name": "Exchange Name",
-            "displayName": "Exchange Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Port": {
-            "name": "Port",
-            "displayName": "Port",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Maximum Input FlowFile Size": {
-            "name": "Maximum Input FlowFile Size",
-            "displayName": "Maximum Input FlowFile Size",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Brokers": {
-            "name": "Brokers",
-            "displayName": "Brokers",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Host Name": {
-            "name": "Host Name",
-            "displayName": "Host Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Headers Pattern": {
-            "name": "Headers Pattern",
-            "displayName": "Headers Pattern",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "SSL Context Service": {
-            "name": "SSL Context Service",
-            "displayName": "SSL Context Service",
+          "CTL.jms": {
+            "name": "CTL.jms",
+            "displayName": "CTL.jms",
             "identifiesControllerService": true,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Delivery Guarantee": {
-            "name": "Delivery Guarantee",
-            "displayName": "Delivery Guarantee",
+          "solace.user": {
+            "name": "solace.user",
+            "displayName": "solace.user",
             "identifiesControllerService": false,
             "sensitive": false,
-            "dynamic": false
+            "dynamic": true
           },
-          "Header Separator": {
-            "name": "Header Separator",
-            "displayName": "Header Separator",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "AMQP Version": {
-            "name": "AMQP Version",
-            "displayName": "AMQP Version",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Virtual Host": {
-            "name": "Virtual Host",
-            "displayName": "Virtual Host",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Username": {
-            "name": "Username",
-            "displayName": "Username",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Client Certificate Authentication Enabled": {
-            "name": "Client Certificate Authentication Enabled",
-            "displayName": "Client Certificate Authentication Enabled",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Headers Source": {
-            "name": "Headers Source",
-            "displayName": "Headers Source",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Password": {
-            "name": "Password",
-            "displayName": "Password",
+          "solace.password": {
+            "name": "solace.password",
+            "displayName": "solace.password",
             "identifiesControllerService": false,
             "sensitive": true,
-            "dynamic": false
+            "dynamic": true
           }
         },
         "style": {},
@@ -2908,415 +2493,60 @@
         "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
       },
       {
-        "identifier": "4ab62c77-edab-36bc-aee3-7f84eff289c3",
-        "instanceIdentifier": "716f4bf9-5ce1-3c8b-1d80-1ec577ebee40",
-        "name": "B-03 Publish to Solace topic",
-        "comments": "",
-        "position": {
-          "x": 800.0,
-          "y": 750.0
-        },
-        "type": "org.apache.nifi.jms.processors.PublishJMS",
-        "bundle": {
-          "group": "org.apache.nifi",
-          "artifact": "nifi-jms-processors-nar",
-          "version": "2.12.0"
-        },
-        "properties": {
-          "Attributes to Send as JMS Headers": "(?!(uuid|filename|path|topic|RouteOnAttribute\\.Route)$|amqp\\$).*",
-          "JMS SSL Context Service": null,
-          "User Name": "#{solace.username}",
-          "JNDI Initial Context Factory Class": null,
-          "Message Body Type": "text",
-          "Allow Illegal Characters in Header Names": "true",
-          "Destination Name": "${topic}",
-          "JMS Connection Factory Implementation Class": null,
-          "Record Reader": null,
-          "JMS Client Libraries": null,
-          "Connection Factory Service": "140d353a-59e2-3a4f-9690-3759e28e17f8",
-          "JNDI Name of the Connection Factory": null,
-          "Connection Client ID": null,
-          "JNDI / JMS Client Libraries": null,
-          "Record Writer": null,
-          "JNDI Principal": null,
-          "Destination Type": "TOPIC",
-          "JNDI Provider URL": null,
-          "JMS Broker URI": null,
-          "Character Set": "UTF-8",
-          "Password": "#{solace.password}",
-          "Maximum Batch Size": "1"
-        },
-        "propertyDescriptors": {
-          "Attributes to Send as JMS Headers": {
-            "name": "Attributes to Send as JMS Headers",
-            "displayName": "Attributes to Send as JMS Headers",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JMS SSL Context Service": {
-            "name": "JMS SSL Context Service",
-            "displayName": "JMS SSL Context Service",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "User Name": {
-            "name": "User Name",
-            "displayName": "User Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JNDI Initial Context Factory Class": {
-            "name": "JNDI Initial Context Factory Class",
-            "displayName": "JNDI Initial Context Factory Class",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Message Body Type": {
-            "name": "Message Body Type",
-            "displayName": "Message Body Type",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Allow Illegal Characters in Header Names": {
-            "name": "Allow Illegal Characters in Header Names",
-            "displayName": "Allow Illegal Characters in Header Names",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JNDI Credentials": {
-            "name": "JNDI Credentials",
-            "displayName": "JNDI Credentials",
-            "identifiesControllerService": false,
-            "sensitive": true,
-            "dynamic": false
-          },
-          "Destination Name": {
-            "name": "Destination Name",
-            "displayName": "Destination Name",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JMS Connection Factory Implementation Class": {
-            "name": "JMS Connection Factory Implementation Class",
-            "displayName": "JMS Connection Factory Implementation Class",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Record Reader": {
-            "name": "Record Reader",
-            "displayName": "Record Reader",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JMS Client Libraries": {
-            "name": "JMS Client Libraries",
-            "displayName": "JMS Client Libraries",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false,
-            "resourceDefinition": {
-              "cardinality": "MULTIPLE",
-              "resourceTypes": [
-                "DIRECTORY",
-                "URL",
-                "FILE"
-              ]
-            }
-          },
-          "Connection Factory Service": {
-            "name": "Connection Factory Service",
-            "displayName": "Connection Factory Service",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JNDI Name of the Connection Factory": {
-            "name": "JNDI Name of the Connection Factory",
-            "displayName": "JNDI Name of the Connection Factory",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Connection Client ID": {
-            "name": "Connection Client ID",
-            "displayName": "Connection Client ID",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JNDI / JMS Client Libraries": {
-            "name": "JNDI / JMS Client Libraries",
-            "displayName": "JNDI / JMS Client Libraries",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false,
-            "resourceDefinition": {
-              "cardinality": "MULTIPLE",
-              "resourceTypes": [
-                "DIRECTORY",
-                "URL",
-                "FILE"
-              ]
-            }
-          },
-          "Record Writer": {
-            "name": "Record Writer",
-            "displayName": "Record Writer",
-            "identifiesControllerService": true,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JNDI Principal": {
-            "name": "JNDI Principal",
-            "displayName": "JNDI Principal",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Destination Type": {
-            "name": "Destination Type",
-            "displayName": "Destination Type",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JNDI Provider URL": {
-            "name": "JNDI Provider URL",
-            "displayName": "JNDI Provider URL",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "JMS Broker URI": {
-            "name": "JMS Broker URI",
-            "displayName": "JMS Broker URI",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Character Set": {
-            "name": "Character Set",
-            "displayName": "Character Set",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Password": {
-            "name": "Password",
-            "displayName": "Password",
-            "identifiesControllerService": false,
-            "sensitive": true,
-            "dynamic": false
-          },
-          "Maximum Batch Size": {
-            "name": "Maximum Batch Size",
-            "displayName": "Maximum Batch Size",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          }
-        },
-        "style": {},
-        "schedulingPeriod": "0 sec",
-        "schedulingStrategy": "TIMER_DRIVEN",
-        "executionNode": "ALL",
-        "penaltyDuration": "30 sec",
-        "yieldDuration": "1 sec",
-        "bulletinLevel": "WARN",
-        "runDurationMillis": 0,
-        "concurrentlySchedulableTaskCount": 1,
-        "autoTerminatedRelationships": [
-          "success"
-        ],
-        "scheduledState": "ENABLED",
-        "retryCount": 10,
-        "retriedRelationships": [],
-        "backoffMechanism": "PENALIZE_FLOWFILE",
-        "maxBackoffPeriod": "10 mins",
-        "componentType": "PROCESSOR",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "a3f0e19d-9113-3e09-91fa-5b453d09bdc9",
-        "instanceIdentifier": "fc24a60d-01a0-1000-2fa6-96705b1d1b63",
-        "name": "Router R-01: split APAC_RECIPIENT_LIST",
-        "comments": "router.gems.mode = header: one copy VV_ROUTE=GEMS for all foreign recipients; topic: one copy per foreign recipient.",
-        "position": {
-          "x": 400.0,
-          "y": 250.0
-        },
-        "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
-        "bundle": {
-          "group": "org.apache.nifi",
-          "artifact": "nifi-groovyx-nar",
-          "version": "2.12.0"
-        },
-        "properties": {
-          "Script File": null,
-          "gems.mode": "#{router.gems.mode}",
-          "Additional Classpath": null,
-          "Script Body": "// Router R-01 (SWIM APAC EMS v4, Bảng 11, bản tối thiểu). One message in from q/vnm/vatm/dev/router/in,\n// one or more copies out. Each copy gets the attributes \"exchange\" and \"routingKey\" for PublishAMQP.\ndef flowFile = session.get()\nif (!flowFile) return\n\ndef X = 'x/vnm/vatm/dev/'\ndef MANDATORY = ['APAC_SOURCE', 'APAC_RECIPIENT_LIST', 'APAC_CATEGORY', 'APAC_CATEGORY_VERSION', 'APAC_MESSAGE_TYPE', 'APAC_TIMESTAMP']\ndef ROUTES = [VV_VATM: 'VV_VATM', VV_HVN: 'VV_HVN']             // recipient code -> VV_ROUTE; codes not starting VV_ go to GEMS\ndef COUNTRY = [VV: 'vnm', WS: 'sgp', VT: 'tha', RJ: 'jpn']       // ICAO prefix -> ISO country in the routing key\ndef ORGANISATION = [VATM: 'vatm', HVN: 'vna', CAAS: 'caas', AEROTHAI: 'aerothai']\ndef MAX_RECIPIENTS = 50\ndef gemsMode = context.getAllProperties().get('gems.mode') ?: 'header'\n\n// The routing key comes from the broker, never from a header.\ndef key = flowFile.getAttribute('amqp$routingKey') ?: ''\n// RabbitMQ headers arrive as attributes \"consume.amqp.<name>\"; give them back their own names. Names the Bridge\n// uses itself (anything with '$', exchange, routingKey) and the headers only the Router may set are dropped.\ndef prefix = 'consume.amqp.'\ndef received = flowFile.getAttributes().findAll { it.key.startsWith(prefix) }\ndef headers = received.collectEntries { [it.key.substring(prefix.length()), it.value] }\n        .findAll { !it.key.contains('$') && !(it.key in ['exchange', 'routingKey', 'VV_ROUTE', 'VV_DLX_REASON']) }\nflowFile = session.removeAllAttributes(flowFile, received.keySet())\nflowFile = session.putAllAttributes(flowFile, headers)\n\ndef stamp = (headers.APAC_TIMESTAMP ?: '') + ',VV_EEMS_IN:' + System.currentTimeMillis()\nflowFile = session.putAttribute(flowFile, 'APAC_TIMESTAMP', stamp)\n\ndef copies = []      // [exchange, routing key, extra attributes]\ndef problems = []\ntry {\n    def missing = MANDATORY.findAll { !headers[it] }\n    def levels = key.split('\\\\.') as List\n    // <ICAO prefix>_<organisation> -> [country, organisation] as they appear in a routing key\n    def place = { String code ->\n        def m = code =~ /^([A-Z]{2})_([A-Z0-9]{1,20})$/\n        m.matches() && COUNTRY[m.group(1)] ? [COUNTRY[m.group(1)], ORGANISATION[m.group(2)] ?: m.group(2).toLowerCase()] : null\n    }\n    if (missing) {\n        problems << 'missing header ' + missing.join(',')\n    } else if (key.startsWith('t.')) {\n        copies << [X + 'swim', key, [:]]\n    } else if (!key.startsWith('tr.') || levels.size() < 6) {\n        problems << 'routing key must be t.<...> or tr.<country>.<org>.<country>.<org>.<env>...: ' + key\n    } else if (place(headers.APAC_SOURCE) != levels[1..2]) {\n        problems << 'APAC_SOURCE ' + headers.APAC_SOURCE + ' does not match the sender in the routing key'   // also stops loops\n    } else {\n        def list = headers.APAC_RECIPIENT_LIST.split(',')*.trim().findAll { it }\n        flowFile = session.putAttribute(flowFile, 'APAC_RECIPIENT_LIST', list.join(','))\n        def recipients = list.findAll { it != headers.APAC_SOURCE }.unique()\n        if (recipients.size() > MAX_RECIPIENTS) {\n            problems << 'more than ' + MAX_RECIPIENTS + ' recipients'\n            recipients = []\n        }\n        def keyFor = { String code -> (levels.take(3) + place(code) + levels.drop(5)).join('.') }\n        def gems = []\n        recipients.each { code ->\n            if (!place(code) || (code.startsWith('VV_') && !ROUTES[code])) problems << 'unknown recipient ' + code\n            else if (ROUTES[code]) copies << [X + 'route', keyFor(code), [VV_ROUTE: ROUTES[code]]]\n            else gems << code\n        }\n        if (gems && gemsMode == 'topic') gems.each { copies << [X + 'route', keyFor(it), [VV_ROUTE: 'GEMS']] }\n        else if (gems) copies << [X + 'route', key, [VV_ROUTE: 'GEMS']]\n        if (!copies && !problems) problems << 'no recipient other than the source'\n    }\n    def tooLong = copies.findAll { it[1].getBytes('UTF-8').length > 255 }\n    if (tooLong) {\n        problems << 'routing key longer than 255 bytes'\n        copies -= tooLong\n    }\n} catch (Exception e) {\n    copies = []\n    problems << 'router error: ' + e\n}\n\ndef out = stamp + ',VV_EEMS_OUT:' + System.currentTimeMillis()\ncopies.each { exchange, routingKey, extra ->\n    def copy = session.clone(flowFile)\n    copy = session.putAllAttributes(copy, extra + [APAC_TIMESTAMP: out, exchange: exchange, routingKey: routingKey])\n    session.transfer(copy, REL_SUCCESS)\n}\nif (problems) {\n    def reason = problems.join('; ')\n    def dead = session.clone(flowFile)\n    dead = session.putAllAttributes(dead, [VV_DLX_REASON: reason.take(500), exchange: X + 'dlx', routingKey: key.take(255)])\n    session.transfer(dead, REL_SUCCESS)\n}\nsession.remove(flowFile)\n",
-          "Failure Strategy": "rollback"
-        },
-        "propertyDescriptors": {
-          "Script File": {
-            "name": "Script File",
-            "displayName": "Script File",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false,
-            "resourceDefinition": {
-              "cardinality": "SINGLE",
-              "resourceTypes": [
-                "FILE"
-              ]
-            }
-          },
-          "gems.mode": {
-            "name": "gems.mode",
-            "displayName": "gems.mode",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "Additional Classpath": {
-            "name": "Additional Classpath",
-            "displayName": "Additional Classpath",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Script Body": {
-            "name": "Script Body",
-            "displayName": "Script Body",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "Failure Strategy": {
-            "name": "Failure Strategy",
-            "displayName": "Failure Strategy",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          }
-        },
-        "style": {},
-        "schedulingPeriod": "0 sec",
-        "schedulingStrategy": "TIMER_DRIVEN",
-        "executionNode": "ALL",
-        "penaltyDuration": "30 sec",
-        "yieldDuration": "1 sec",
-        "bulletinLevel": "WARN",
-        "runDurationMillis": 0,
-        "concurrentlySchedulableTaskCount": 1,
-        "autoTerminatedRelationships": [],
-        "scheduledState": "ENABLED",
-        "retryCount": 10,
-        "retriedRelationships": [],
-        "backoffMechanism": "PENALIZE_FLOWFILE",
-        "maxBackoffPeriod": "10 mins",
-        "componentType": "PROCESSOR",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "ea151bc2-19c7-387a-b322-85b8cf9356aa",
-        "instanceIdentifier": "fc24a543-01a0-1000-23d8-9609d80a0b65",
-        "name": "B-04 Routing key = topic with / -> .",
+        "identifier": "0d5c4665-ce86-5ab1-b7be-11ea58736fe1",
+        "instanceIdentifier": "291b3844-0221-4ead-b479-f4409f34eefb",
+        "name": "B-04 RabbitMQ properties from JMS, routing key = topic with / -> .",
         "comments": "",
         "position": {
           "x": 0.0,
           "y": 250.0
         },
-        "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+        "type": "org.apache.nifi.processors.groovyx.ExecuteGroovyScript",
         "bundle": {
           "group": "org.apache.nifi",
-          "artifact": "nifi-update-attribute-nar",
+          "artifact": "nifi-groovyx-nar",
           "version": "2.12.0"
         },
         "properties": {
-          "Delete Attributes Expression": null,
-          "amqp$messageId": "${jms_messageId}",
-          "Store State": "Do not store state",
-          "amqp$correlationId": "${jms_correlationId}",
-          "amqp$contentType": "${contentType}",
-          "amqp$deliveryMode": "${jms_deliveryMode}",
-          "Cache Value Lookup Cache Size": "100",
-          "Stateful Variables Initial Value": null,
-          "routingKey": "${jms_destination:replace('/', '.')}"
+          "Script File": null,
+          "Additional Classpath": null,
+          "Failure Strategy": "rollback",
+          "Script Body": "// B-04: Solace message -> RabbitMQ properties, unchanged. Routing key = topic with '/' -> '.'.\n// A property is set only when the Solace message has it: an empty one would reach RabbitMQ as \"\".\ndef flowFile = session.get()\nif (!flowFile) return\ndef a = flowFile.getAttributes()\nif (!a.jms_destination) {\n    log.error('No jms_destination on {}, sent to failure', flowFile)\n    session.transfer(session.penalize(flowFile), REL_FAILURE)\n    return\n}\ndef properties = [\n    'amqp$messageId'    : a.messageId ?: a.jms_messageId,\n    'amqp$correlationId': a.jms_correlationId,\n    'amqp$contentType'  : a.contentType,\n    'amqp$deliveryMode' : a.jms_deliveryMode,\n    'amqp$replyTo'      : a.jms_replyTo,\n].findAll { it.value }\nproperties.routingKey = a.jms_destination.replace('/', '.')\nflowFile = session.putAllAttributes(flowFile, properties)\nsession.transfer(flowFile, REL_SUCCESS)\n"
         },
         "propertyDescriptors": {
-          "Delete Attributes Expression": {
-            "name": "Delete Attributes Expression",
-            "displayName": "Delete Attributes Expression",
+          "Script File": {
+            "name": "Script File",
+            "displayName": "Script File",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "dynamic": false,
+            "resourceDefinition": {
+              "cardinality": "SINGLE",
+              "resourceTypes": [
+                "FILE"
+              ]
+            }
+          },
+          "Additional Classpath": {
+            "name": "Additional Classpath",
+            "displayName": "Additional Classpath",
             "identifiesControllerService": false,
             "sensitive": false,
             "dynamic": false
           },
-          "amqp$messageId": {
-            "name": "amqp$messageId",
-            "displayName": "amqp$messageId",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "Store State": {
-            "name": "Store State",
-            "displayName": "Store State",
+          "Script Body": {
+            "name": "Script Body",
+            "displayName": "Script Body",
             "identifiesControllerService": false,
             "sensitive": false,
             "dynamic": false
           },
-          "amqp$correlationId": {
-            "name": "amqp$correlationId",
-            "displayName": "amqp$correlationId",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "amqp$contentType": {
-            "name": "amqp$contentType",
-            "displayName": "amqp$contentType",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "amqp$deliveryMode": {
-            "name": "amqp$deliveryMode",
-            "displayName": "amqp$deliveryMode",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
-          },
-          "Cache Value Lookup Cache Size": {
-            "name": "Cache Value Lookup Cache Size",
-            "displayName": "Cache Value Lookup Cache Size",
+          "Failure Strategy": {
+            "name": "Failure Strategy",
+            "displayName": "Failure Strategy",
             "identifiesControllerService": false,
             "sensitive": false,
             "dynamic": false
-          },
-          "Stateful Variables Initial Value": {
-            "name": "Stateful Variables Initial Value",
-            "displayName": "Stateful Variables Initial Value",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": false
-          },
-          "routingKey": {
-            "name": "routingKey",
-            "displayName": "routingKey",
-            "identifiesControllerService": false,
-            "sensitive": false,
-            "dynamic": true
           }
         },
         "style": {},
@@ -3326,7 +2556,7 @@
         "penaltyDuration": "30 sec",
         "yieldDuration": "1 sec",
         "bulletinLevel": "WARN",
-        "runDurationMillis": 25,
+        "runDurationMillis": 0,
         "concurrentlySchedulableTaskCount": 1,
         "autoTerminatedRelationships": [],
         "scheduledState": "ENABLED",
@@ -3382,7 +2612,7 @@
           "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 RabbitMQ headers -> JMS properties",
+          "name": "B-03 Publish to Solace, topic = key with . -> /",
           "comments": "",
           "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
         },
@@ -3390,7 +2620,7 @@
           "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 RabbitMQ headers -> JMS properties",
+          "name": "B-03 Publish to Solace, topic = key with . -> /",
           "comments": "",
           "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
         },
@@ -3398,40 +2628,6 @@
         "zIndex": 0,
         "selectedRelationships": [
           "failure"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "loadBalanceCompression": "DO_NOT_COMPRESS",
-        "componentType": "CONNECTION",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "393faec0-0a94-3fe7-8120-5f9e6d685cb1",
-        "instanceIdentifier": "f85f33bf-01a0-1000-4026-1ba5158fdda2",
-        "source": {
-          "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 RabbitMQ headers -> JMS properties",
-          "comments": "",
-          "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
-        },
-        "destination": {
-          "id": "8c9db5d3-a279-37dc-a546-c2acf2caa370",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 RabbitMQ properties -> JMS properties, topic = key with . -> /",
-          "comments": "",
-          "instanceIdentifier": "37e59fb1-9216-3093-7736-6a88f6815b05"
-        },
-        "labelIndex": 1,
-        "zIndex": 0,
-        "selectedRelationships": [
-          "success"
         ],
         "backPressureObjectThreshold": 10000,
         "backPressureDataSizeThreshold": "1 GB",
@@ -3458,7 +2654,7 @@
           "id": "19a19596-c914-3f0d-85ca-6aa13755ec26",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 RabbitMQ headers -> JMS properties",
+          "name": "B-03 Publish to Solace, topic = key with . -> /",
           "comments": "",
           "instanceIdentifier": "f85f32fd-01a0-1000-6869-835b6717134b"
         },
@@ -3466,108 +2662,6 @@
         "zIndex": 0,
         "selectedRelationships": [
           "success"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "loadBalanceCompression": "DO_NOT_COMPRESS",
-        "componentType": "CONNECTION",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "48a86d29-becd-300e-b7d4-e320f7e9b4b1",
-        "instanceIdentifier": "fc24a682-01a0-1000-aa2e-5897d994ce1b",
-        "source": {
-          "id": "a3f0e19d-9113-3e09-91fa-5b453d09bdc9",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router R-01: split APAC_RECIPIENT_LIST",
-          "comments": "router.gems.mode = header: one copy VV_ROUTE=GEMS for all foreign recipients; topic: one copy per foreign recipient.",
-          "instanceIdentifier": "fc24a60d-01a0-1000-2fa6-96705b1d1b63"
-        },
-        "destination": {
-          "id": "863008b2-b99e-3a31-baa8-71feed580000",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router Publish to RabbitMQ ${exchange}",
-          "comments": "",
-          "instanceIdentifier": "fc24a637-01a0-1000-c9c2-fe9190c238df"
-        },
-        "labelIndex": 1,
-        "zIndex": 0,
-        "selectedRelationships": [
-          "success"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "loadBalanceCompression": "DO_NOT_COMPRESS",
-        "componentType": "CONNECTION",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "49aa1e84-e12b-3ab1-897d-0d454dc7b7c3",
-        "instanceIdentifier": "fc24a65e-01a0-1000-b91b-e2e2c2b84805",
-        "source": {
-          "id": "729c4232-bbc6-3b9c-ab8a-9973dbefc5a2",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router Consume RabbitMQ q/vnm/vatm/dev/router/in",
-          "comments": "",
-          "instanceIdentifier": "fc24a5e5-01a0-1000-9a07-bdaf84151599"
-        },
-        "destination": {
-          "id": "a3f0e19d-9113-3e09-91fa-5b453d09bdc9",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router R-01: split APAC_RECIPIENT_LIST",
-          "comments": "router.gems.mode = header: one copy VV_ROUTE=GEMS for all foreign recipients; topic: one copy per foreign recipient.",
-          "instanceIdentifier": "fc24a60d-01a0-1000-2fa6-96705b1d1b63"
-        },
-        "labelIndex": 1,
-        "zIndex": 0,
-        "selectedRelationships": [
-          "success"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "loadBalanceCompression": "DO_NOT_COMPRESS",
-        "componentType": "CONNECTION",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "3f8b7ba0-89c0-3d9e-9f80-a70529fbddcc",
-        "instanceIdentifier": "980a63eb-2f25-3e99-9890-1c69039cc674",
-        "source": {
-          "id": "4ab62c77-edab-36bc-aee3-7f84eff289c3",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 Publish to Solace topic",
-          "comments": "",
-          "instanceIdentifier": "716f4bf9-5ce1-3c8b-1d80-1ec577ebee40"
-        },
-        "destination": {
-          "id": "4ab62c77-edab-36bc-aee3-7f84eff289c3",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 Publish to Solace topic",
-          "comments": "",
-          "instanceIdentifier": "716f4bf9-5ce1-3c8b-1d80-1ec577ebee40"
-        },
-        "labelIndex": 1,
-        "zIndex": 0,
-        "selectedRelationships": [
-          "failure"
         ],
         "backPressureObjectThreshold": 10000,
         "backPressureDataSizeThreshold": "1 GB",
@@ -3591,12 +2685,12 @@
           "instanceIdentifier": "fc24a521-01a0-1000-70db-5eb3f26dbec4"
         },
         "destination": {
-          "id": "ea151bc2-19c7-387a-b322-85b8cf9356aa",
+          "id": "0d5c4665-ce86-5ab1-b7be-11ea58736fe1",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-04 Routing key = topic with / -> .",
+          "name": "B-04 RabbitMQ properties from JMS, routing key = topic with / -> .",
           "comments": "",
-          "instanceIdentifier": "fc24a543-01a0-1000-23d8-9609d80a0b65"
+          "instanceIdentifier": "291b3844-0221-4ead-b479-f4409f34eefb"
         },
         "labelIndex": 1,
         "zIndex": 0,
@@ -3617,12 +2711,12 @@
         "identifier": "4006e1df-fd15-3aaa-a0a4-c72155588bc0",
         "instanceIdentifier": "fc24a5ab-01a0-1000-11b8-29bac7affff2",
         "source": {
-          "id": "ea151bc2-19c7-387a-b322-85b8cf9356aa",
+          "id": "0d5c4665-ce86-5ab1-b7be-11ea58736fe1",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-04 Routing key = topic with / -> .",
+          "name": "B-04 RabbitMQ properties from JMS, routing key = topic with / -> .",
           "comments": "",
-          "instanceIdentifier": "fc24a543-01a0-1000-23d8-9609d80a0b65"
+          "instanceIdentifier": "291b3844-0221-4ead-b479-f4409f34eefb"
         },
         "destination": {
           "id": "732982c2-1f68-3c7e-94dd-7b1b45666716",
@@ -3648,91 +2742,23 @@
         "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
       },
       {
-        "identifier": "12773e83-4764-30f0-a954-023fbf321dfd",
-        "instanceIdentifier": "fc24a803-01a0-1000-2ab9-f1eb2febda74",
+        "identifier": "cc466dfd-a78b-501b-b01a-542f5aa248da",
+        "instanceIdentifier": "0e294979-2ba0-4883-beef-01bc1936f306",
         "source": {
-          "id": "8c9db5d3-a279-37dc-a546-c2acf2caa370",
+          "id": "0d5c4665-ce86-5ab1-b7be-11ea58736fe1",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 RabbitMQ properties -> JMS properties, topic = key with . -> /",
+          "name": "B-04 RabbitMQ properties from JMS, routing key = topic with / -> .",
           "comments": "",
-          "instanceIdentifier": "37e59fb1-9216-3093-7736-6a88f6815b05"
+          "instanceIdentifier": "291b3844-0221-4ead-b479-f4409f34eefb"
         },
         "destination": {
-          "id": "4ab62c77-edab-36bc-aee3-7f84eff289c3",
+          "id": "0d5c4665-ce86-5ab1-b7be-11ea58736fe1",
           "type": "PROCESSOR",
           "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "B-03 Publish to Solace topic",
+          "name": "B-04 RabbitMQ properties from JMS, routing key = topic with / -> .",
           "comments": "",
-          "instanceIdentifier": "716f4bf9-5ce1-3c8b-1d80-1ec577ebee40"
-        },
-        "labelIndex": 1,
-        "zIndex": 0,
-        "selectedRelationships": [
-          "success"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "loadBalanceCompression": "DO_NOT_COMPRESS",
-        "componentType": "CONNECTION",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "8d6a0671-bfe2-3dba-93c4-072b0bed2c81",
-        "instanceIdentifier": "fc24a6a7-01a0-1000-5cd1-7197de0c1bc1",
-        "source": {
-          "id": "a3f0e19d-9113-3e09-91fa-5b453d09bdc9",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router R-01: split APAC_RECIPIENT_LIST",
-          "comments": "router.gems.mode = header: one copy VV_ROUTE=GEMS for all foreign recipients; topic: one copy per foreign recipient.",
-          "instanceIdentifier": "fc24a60d-01a0-1000-2fa6-96705b1d1b63"
-        },
-        "destination": {
-          "id": "a3f0e19d-9113-3e09-91fa-5b453d09bdc9",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router R-01: split APAC_RECIPIENT_LIST",
-          "comments": "router.gems.mode = header: one copy VV_ROUTE=GEMS for all foreign recipients; topic: one copy per foreign recipient.",
-          "instanceIdentifier": "fc24a60d-01a0-1000-2fa6-96705b1d1b63"
-        },
-        "labelIndex": 1,
-        "zIndex": 0,
-        "selectedRelationships": [
-          "failure"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "loadBalanceCompression": "DO_NOT_COMPRESS",
-        "componentType": "CONNECTION",
-        "groupIdentifier": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12"
-      },
-      {
-        "identifier": "4c9921a6-e5c0-3c80-b253-2bb21394afc0",
-        "instanceIdentifier": "fc24a6c9-01a0-1000-303b-1d3b28a16ca3",
-        "source": {
-          "id": "863008b2-b99e-3a31-baa8-71feed580000",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router Publish to RabbitMQ ${exchange}",
-          "comments": "",
-          "instanceIdentifier": "fc24a637-01a0-1000-c9c2-fe9190c238df"
-        },
-        "destination": {
-          "id": "863008b2-b99e-3a31-baa8-71feed580000",
-          "type": "PROCESSOR",
-          "groupId": "5e5441f7-711e-30cb-b1dc-b2e3ce573e12",
-          "name": "Router Publish to RabbitMQ ${exchange}",
-          "comments": "",
-          "instanceIdentifier": "fc24a637-01a0-1000-c9c2-fe9190c238df"
+          "instanceIdentifier": "291b3844-0221-4ead-b479-f4409f34eefb"
         },
         "labelIndex": 1,
         "zIndex": 0,
@@ -3901,12 +2927,6 @@
           "name": "solace.password",
           "sensitive": true,
           "provided": false
-        },
-        {
-          "name": "router.gems.mode",
-          "sensitive": false,
-          "provided": false,
-          "value": "header"
         },
         {
           "name": "rabbitmq.password",
