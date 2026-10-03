@@ -15,6 +15,7 @@ _bridge_test_env() {
     export SOLACE_VPN="${SOLACE_VPN:-default}"
     export SOLACE_USERNAME="${SOLACE_USERNAME:-hieu}"
     export RABBITMQ_HOST="${RABBITMQ_HOST:-192.168.121.61}"
+    export RABBITMQ_PORT="${RABBITMQ_PORT:-5672}"
     export RABBITMQ_MANAGEMENT_PORT="${RABBITMQ_MANAGEMENT_PORT:-15672}"
     export RABBITMQ_VHOST="${RABBITMQ_VHOST:-swim_sg}"
     export RABBITMQ_USERNAME="${RABBITMQ_USERNAME:-hieu}"
@@ -34,9 +35,10 @@ _bridge_test_env() {
     fi
     echo "OK   java $version"
 
-    # The Solace jars (the same ones NiFi uses) and the JMS API, which NiFi brings itself and so is not in lib/.
+    # The Solace and RabbitMQ AMQP 1.0 jars (the same ones NiFi uses), and the JMS API and a silent log binding, which
+    # NiFi brings itself and so are not in lib/ or lib-rabbitmq/.
     local list dir url
-    for list in "nifi/solace-jars.txt:lib" "tests/jars.txt:tests/lib"; do
+    for list in "nifi/solace-jars.txt:lib" "nifi/rabbitmq-jars.txt:lib-rabbitmq" "tests/jars.txt:tests/lib"; do
         dir="$root/${list#*:}"
         mkdir -p "$dir"
         while read -r url; do
@@ -45,13 +47,18 @@ _bridge_test_env() {
                 || { echo "FAIL download $url"; return 1; }
         done < "$root/${list%%:*}"
     done
-    echo "OK   jars in lib/ and tests/lib/"
+    echo "OK   jars in lib/, lib-rabbitmq/ and tests/lib/"
 
-    java -cp "$root/lib/*:$root/tests/lib/*" "$root/tests/BridgeTest.java" ping || {
-        unset SOLACE_PASSWORD RABBITMQ_PASSWORD
-        echo "Passwords cleared. Fix the setting above, then run \`source tests/env.sh\` again."
-        return 1
-    }
+    # Exit code 2: could not log in; 1: logged in, but the Bridge is not connected to RabbitMQ over AMQP 1.0.
+    java -cp "$root/lib/*:$root/lib-rabbitmq/*:$root/tests/lib/*" "$root/tests/BridgeTest.java" ping
+    case $? in
+        0) ;;
+        1) echo "Is the Bridge running? Start the group \`Solace RabbitMQ Bridge\` in NiFi, then run \`source tests/env.sh\` again."
+           return 1 ;;
+        *) unset SOLACE_PASSWORD RABBITMQ_PASSWORD
+           echo "Passwords cleared. Fix the setting above, then run \`source tests/env.sh\` again."
+           return 1 ;;
+    esac
 }
 _bridge_test_env
 unset -f _bridge_test_env

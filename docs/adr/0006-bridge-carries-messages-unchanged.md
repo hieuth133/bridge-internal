@@ -1,6 +1,6 @@
 # The Bridge carries messages unchanged; the Router is not part of it
 
-Changes part of ADR 0004: B-03 now publishes to Solace from a Groovy script, not `PublishJMS`.
+Changes part of ADR 0004: B-03 now publishes to Solace from a Groovy script, not `PublishJMS`. Changed by ADR 0007: the RabbitMQ side is AMQP 1.0, and `nifi/check-headers.py` is retired in favour of `tests/`.
 
 Commit 84b3354 put Router R-01 inside the NiFi flow. It read every message entering the External EMS, partner-to-partner traffic too, and it changed them: it trimmed `APAC_RECIPIENT_LIST`, dropped partner headers, added `VV_ROUTE` and `VV_DLX_REASON`, and stamped `APAC_TIMESTAMP`. B-03 then carried `VV_ROUTE` into Solace, so an HVN message to `VV_VATM,WS_CAAS` looked on Solace as if it were only for `VV_VATM`.
 

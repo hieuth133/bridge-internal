@@ -2,3 +2,4 @@ lib/
 __pycache__/
 .vscode
 docs/Documents
+lib-rabbitmq/
