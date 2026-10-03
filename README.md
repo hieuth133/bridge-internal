@@ -307,6 +307,53 @@ Script hỏi mật khẩu đăng nhập NiFi (hoặc đọc biến `NIFI_PASSWOR
 
 Kết quả đúng kết thúc bằng `PASS`. Mỗi chỗ sai được in `FAIL` kèm giá trị mong đợi, và script thoát với mã 1. Các biến tuỳ chọn: `NIFI_URL` (mặc định `https://localhost:8443`), `NIFI_USERNAME` (mặc định `admin`), `RABBITMQ_MANAGEMENT_PORT` (mặc định `15672`).
 
+### Kiểm tra bằng tay
+
+Thư mục `tests/` có các script để tester tự chạy, mỗi script kiểm tra một đường, trên máy của broker gửi:
+
+| Script | Chạy trên máy | Gửi | Kiểm tra ở |
+|---|---|---|---|
+| 1. `source tests/env.sh` | cả hai | đặt biến môi trường, tải jar, thử đăng nhập hai broker | |
+| 2. `tests/2-pubsub-solace-to-rabbitmq.sh` | Solace | Pub/Sub: Solace topic `t/vnm/vatm/dev/atfm/v1/fpl` | RabbitMQ `x/vnm/vatm/dev/ingress`, key `t.vnm.vatm.dev.atfm.v1.fpl` |
+| 3. `tests/3-rr-solace-to-rabbitmq.sh` | Solace | Async Request/Reply: Solace topic `tr/vnm/vatm/vnm/vna/dev/fpms/v1/filing/reply`, `APAC_RECIPIENT_LIST` = `VV_VATM,VV_HVN,WS_CAAS`, reply-to là queue `q/vnm/vatm/dev/fpms/reply` | RabbitMQ `x/vnm/vatm/dev/ingress`, `reply_to` giữ nguyên |
+| 4. `tests/4-pubsub-rabbitmq-to-solace.sh` | RabbitMQ | Pub/Sub: exchange `x/vnm/vatm/dev/swim`, key `t.vnm.acv.dev.aodb.v1.departure.publish.vvts`, `APAC_RECIPIENT_LIST` = `VV_VATM, WS_CAAS` | Solace topic `t/vnm/acv/dev/aodb/v1/departure/publish/vvts` |
+| 5. `tests/5-rr-rabbitmq-to-solace.sh` | RabbitMQ | Async Request/Reply: exchange `x/vnm/vatm/dev/route`, `VV_ROUTE` = `VV_VATM`, key `tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request`, `APAC_RECIPIENT_LIST` = `VV_VATM,WS_CAAS`, reply-to `q/vnm/vna/dev/swim/reply` | Solace topic `tr/vnm/vna/vnm/vatm/dev/swim/v1/filing/request`, qua selector của VATM; không có `VV_ROUTE` |
+
+Router chưa chạy, nên script 4 và 5 gửi thẳng vào `swim`/`route` như Router sẽ làm. Request/Reply chỉ kiểm tra một chiều: request tới bên kia với reply-to và correlation-id nguyên vẹn. Trả lời là việc của bên nhận.
+
+Mỗi máy cần Java 11 trở lên, `curl` và một bản sao của repo này. Máy RabbitMQ phải tới được Solace cổng `55555`, máy Solace phải tới được RabbitMQ management cổng `15672`. Không cần NiFi hay Python.
+
+1. Trong thư mục repo, chạy:
+
+   ```
+   source tests/env.sh
+   ```
+
+   Mặc định là Solace `tcp://localhost:55555`, VPN `default`, user `hieu`; RabbitMQ `192.168.121.61`, management port `15672`, vhost `swim_sg`, user `hieu`. Muốn khác thì export trước khi `source` (`SOLACE_HOST`, `SOLACE_VPN`, `SOLACE_USERNAME`, `RABBITMQ_HOST`, `RABBITMQ_MANAGEMENT_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USERNAME`). Ví dụ trên máy RabbitMQ: `export SOLACE_HOST=tcp://solace.tailfac6af.ts.net:55555`.
+
+   Script hỏi mật khẩu Solace và RabbitMQ nếu chưa có (`SOLACE_PASSWORD`, `RABBITMQ_PASSWORD`). Mật khẩu chỉ nằm trong shell đang mở, không ghi ra file. Nếu thiếu jar, script tự tải từ Maven Central: jar Solace JMS (`nifi/solace-jars.txt`) vào `lib/`, và `jakarta.jms-api` (`tests/jars.txt`) vào `tests/lib/`. Jar sau để riêng, vì NiFi đã có sẵn nó và không được có thêm một bản trong `lib/` mà NiFi dùng.
+
+   Kết quả đúng: `OK   java`, `OK   jars`, `OK   Solace`, `OK   RabbitMQ`, `PASS`. Nếu đăng nhập sai, mật khẩu bị xoá để lần `source` sau hỏi lại. Kiểm tra xong thì xoá mật khẩu khỏi shell: `unset SOLACE_PASSWORD RABBITMQ_PASSWORD`. Không gõ `export SOLACE_PASSWORD=...` trực tiếp, vì lệnh đó nằm lại trong history; để script hỏi.
+2. Trên máy Solace chạy `tests/2-pubsub-solace-to-rabbitmq.sh` và `tests/3-rr-solace-to-rabbitmq.sh`. Trên máy RabbitMQ chạy `tests/4-pubsub-rabbitmq-to-solace.sh` và `tests/5-rr-rabbitmq-to-solace.sh`. Bridge phải đang chạy.
+
+Mỗi script gửi một message có correlation-id riêng (`bridge-test-<thời gian>`), mặc định giống message của `check-headers.py`, rồi đợi tối đa 30 giây ở broker bên kia. Nó in từng dòng `OK`/`FAIL`:
+- topic hoặc routing key;
+- 14 header Pathfinder bằng hệt bản gửi, kể cả `APAC_TIMESTAMP`; bên RabbitMQ không có header lạ, bên Solace không có `VV_ROUTE`;
+- correlation-id, content-type, message-id, reply-to và từng byte payload.
+
+Kết thúc bằng `PASS` (mã thoát 0) hoặc `FAIL` (mã 1). Mã 2 nghĩa là chưa chạy được: thiếu biến, sai mật khẩu, không kết nối được.
+
+Tuỳ chọn:
+- `--recipients LIST`: thay `APAC_RECIPIENT_LIST`. Ví dụ `tests/5-rr-rabbitmq-to-solace.sh --recipients WS_CAAS`: VATM không còn trong danh sách, selector của VATM không khớp, nên script báo không nhận được gì. Đó là kết quả đúng.
+- `--payload FILE`: gửi file UTF-8 này thay cho message FIXM mẫu.
+- `--topic TOPIC` (script 2, 3) hoặc `--key KEY` (script 4, 5): gửi tới topic hoặc routing key khác. Topic phải nằm trong subscription của Solace queue `q/vnm/vatm/dev/bridge/outbound`, key phải tới được `q/vnm/vatm/dev/bridge/inbound`; nếu không, message không đi qua Bridge.
+
+Script không lấy message của ai:
+- Script 2 và 3 tạo queue tạm `q/vnm/vatm/dev/bridge-test/<correlation-id>` gắn vào fanout `x/vnm/vatm/dev/ingress`, đọc bản sao message ở đó, rồi xoá queue. Nếu script bị ngắt giữa chừng, RabbitMQ tự xoá queue sau 10 phút. Bản gốc vẫn vào `q/vnm/vatm/dev/router/in` như mọi message outbound và nằm chờ Router.
+- Script 4 và 5 tạo subscription tạm trên Solace, chỉ nhận message có correlation-id của lần chạy đó; subscription mất khi script kết thúc.
+
+Message test là message thật: ngoài bản script đọc, các queue khác gắn vào cùng exchange cũng nhận một bản. Bản trong `q/vnm/vatm/dev/router/in` (script 2, 3) sẽ được Router gửi tới các bên trong `APAC_RECIPIENT_LIST` khi Router chạy; script 4 có thể tới các queue khác gắn vào `swim` với key đó. Trên môi trường không phải `dev`, dùng `--recipients` với mã không thuộc đối tác thật.
+
 ## Những gì Bridge giữ lại
 
 Bridge giữ nguyên mọi thứ: payload, mọi header (kể cả `APAC_RECIPIENT_LIST` và `APAC_TIMESTAMP`, từng ký tự, cả khoảng trắng), message-id, correlation-id, content-type và reply-to.
