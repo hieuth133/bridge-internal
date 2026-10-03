@@ -1,27 +1,33 @@
 #!/usr/bin/env python3
-"""Check that the Bridge routes by topic and by header, and keeps every Pathfinder header and the payload.
+"""Check that the Bridge carries messages between Solace and RabbitMQ without changing them.
 
-Sends one message per scenario through the running Bridge, Solace to RabbitMQ and RabbitMQ to Solace,
-and checks where each copy arrives, its routing key or topic, every header, and the payload byte for byte.
+Sends one message per scenario through the running Bridge, Solace to RabbitMQ (B-04) and RabbitMQ to Solace (B-03),
+and checks where it arrives, its routing key or topic, every header (APAC_TIMESTAMP included), message-id,
+correlation-id, content-type, reply-to and the payload byte for byte. The only change allowed is that VV_ROUTE,
+which exists only inside RabbitMQ, does not reach Solace.
+
+RabbitMQ to Solace messages are put straight on x/vnm/vatm/dev/swim and x/vnm/vatm/dev/route, as the Router would.
+Solace to RabbitMQ messages are read from q/vnm/vatm/dev/router/in, the queue behind x/vnm/vatm/dev/ingress, so no
+Router may be reading that queue while this runs.
+
 It works through the NiFi REST API only: it builds a temporary process group inside "Solace RabbitMQ Bridge"
 that uses the Bridge's own Parameter Context, so it needs no broker password. It removes everything it created,
-and takes its messages out of the test queues when they hold nothing else.
+and takes its messages out of q/vnm/vatm/dev/router/in when that queue holds nothing else.
 
     python3 nifi/check-headers.py        (asks for the NiFi password, or reads NIFI_PASSWORD)
 
 Optional: NIFI_URL (default https://localhost:8443), NIFI_USERNAME (default admin),
 RABBITMQ_MANAGEMENT_PORT (default 15672). Exit code 0 means every check passed.
 """
-import base64, getpass, hashlib, json, os, re, ssl, sys, time, urllib.parse, urllib.request
+import base64, getpass, hashlib, json, os, ssl, sys, time, urllib.parse, urllib.request
 
 NIFI = os.environ.get("NIFI_URL", "https://localhost:8443") + "/nifi-api"
 MGMT_PORT = os.environ.get("RABBITMQ_MANAGEMENT_PORT", "15672")
 BRIDGE_GROUP = "Solace RabbitMQ Bridge"
-INGRESS = "x/vnm/vatm/dev/ingress"
-VNA, GEMS = "q/vnm/vna/dev/swim/flight", "q/vnm/vatm/dev/eems/to-gems"
-DLQ, UNROUTED = "q/vnm/vatm/dev/eems/dlq", "q/vnm/vatm/dev/eems/unrouted"
-SOLACE_TOPIC = "t/vnm/acv/dev/>"            # topic routing into Solace
-SOLACE_HEADER = "tr/*/*/vnm/vatm/dev/>"     # header routing into Solace: selector on APAC_RECIPIENT_LIST
+SWIM, ROUTE = "x/vnm/vatm/dev/swim", "x/vnm/vatm/dev/route"   # where the Router puts messages for bridge/inbound
+ROUTER_IN = "q/vnm/vatm/dev/router/in"      # B-04 publishes into x/vnm/vatm/dev/ingress, which feeds this queue
+SOLACE_TOPIC = "t/vnm/acv/dev/>"            # topic subscription on Solace
+SOLACE_HEADER = "tr/*/*/vnm/vatm/dev/>"     # header subscription on Solace: selector on APAC_RECIPIENT_LIST
 SELECTOR = " OR ".join(["APAC_RECIPIENT_LIST = 'VV_VATM'"] + [f"APAC_RECIPIENT_LIST LIKE '{p}' ESCAPE '\\'"
                                                                 for p in (r"VV\_VATM,%", r"%,VV\_VATM", r"%,VV\_VATM,%")])
 RUN = f"check-{int(time.time())}"
@@ -40,31 +46,22 @@ PAYLOAD = ('<?xml version="1.0" encoding="UTF-8"?>\n<fx:Flight xmlns:fx="http://
            + "".join(f'  <fx:routePoint seq="{i}">Điểm {i}: Tân Sơn Nhất → Changi &amp; &lt;FL350&gt; "quoted" \'single\'\t(tab)</fx:routePoint>\n'
                      for i in range(150))
            + "</fx:Flight>\n").encode()
+CONTENT_TYPE = "application/xml"
+SOLACE_MESSAGE_ID = {"out-header"}  # these Solace senders set the property messageId; the others get Solace's JMS id
 
-# name: (sent from, topic or routing key, header changes, {where it must arrive: [(routing key or topic, VV_ROUTE)]})
+# name: (sent from, topic or routing key, header changes, reply-to or None, (where it must arrive, routing key or topic))
 SCENARIOS = {
-    "out-topic": ("solace", "t/vnm/vatm/dev/atfm/v1/fpl", {"APAC_RECIPIENT_LIST": "VV_HVN"},
-                  {VNA: [("t.vnm.vatm.dev.atfm.v1.fpl", None)]}),
+    "out-topic": ("solace", "t/vnm/vatm/dev/atfm/v1/fpl", {"APAC_RECIPIENT_LIST": "VV_HVN"}, None,
+                  (ROUTER_IN, "t.vnm.vatm.dev.atfm.v1.fpl")),
+    # PublishJMS, the sender here, only sets a reply-to whose name has "queue" or "topic" in it.
     "out-header": ("solace", "tr/vnm/vatm/vnm/vna/dev/fpms/v1/filing/reply", {"APAC_RECIPIENT_LIST": "VV_VATM,VV_HVN,WS_CAAS"},
-                   {VNA: [("tr.vnm.vatm.vnm.vna.dev.fpms.v1.filing.reply", "VV_HVN")],          # no copy back to VV_VATM
-                    GEMS: [("tr.vnm.vatm.vnm.vna.dev.fpms.v1.filing.reply", "GEMS")]}),
-    "in-topic": ("rabbitmq", "t.vnm.acv.dev.aodb.v1.departure.publish.vvts", {"APAC_SOURCE": "VV_ACV", "APAC_RECIPIENT_LIST": "VV_VATM"},
-                 {SOLACE_TOPIC: [("t/vnm/acv/dev/aodb/v1/departure/publish/vvts", None)]}),
+                   "q/vnm/vatm/dev/fpms/queue/reply", (ROUTER_IN, "tr.vnm.vatm.vnm.vna.dev.fpms.v1.filing.reply")),
+    # A space in the list: the Bridge must not trim it.
+    "in-topic": ("rabbitmq", "t.vnm.acv.dev.aodb.v1.departure.publish.vvts", {"APAC_SOURCE": "VV_ACV", "APAC_RECIPIENT_LIST": "VV_VATM, WS_CAAS"},
+                 None, (SOLACE_TOPIC, "t/vnm/acv/dev/aodb/v1/departure/publish/vvts")),
+    # HVN sends to VATM and CAAS; the Router's copy for VATM carries VV_ROUTE=VV_VATM, Solace must get the full list.
     "in-header": ("rabbitmq", "tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request", {"APAC_SOURCE": "VV_HVN", "APAC_RECIPIENT_LIST": "VV_VATM,WS_CAAS"},
-                  {SOLACE_HEADER: [("tr/vnm/vna/vnm/vatm/dev/swim/v1/filing/request", "VV_VATM")],
-                   GEMS: [("tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request", "GEMS")]}),
-    "unknown-recipient": ("rabbitmq", "tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request", {"APAC_SOURCE": "VV_HVN", "APAC_RECIPIENT_LIST": "VV_XYZ"},
-                          {DLQ: [("tr.vnm.vna.vnm.vatm.dev.swim.v1.filing.request", None)]}),
-    "sender-mismatch": ("rabbitmq", "tr.vnm.vatm.vnm.vna.dev.fpms.v1.filing.reply", {"APAC_SOURCE": "VV_ACV", "APAC_RECIPIENT_LIST": "VV_VATM"},
-                        {DLQ: [("tr.vnm.vatm.vnm.vna.dev.fpms.v1.filing.reply", None)]}),   # would loop VATM -> VATM
-    "no-header-binding": ("rabbitmq", "tr.vnm.vatm.vnm.vna.dev.aim.v1.notam.reply", {"APAC_RECIPIENT_LIST": "VV_HVN", "APAC_CATEGORY": "JSON"},
-                          {UNROUTED: [("tr.vnm.vatm.vnm.vna.dev.aim.v1.notam.reply", "VV_HVN")]}),
-}
-DLQ_REASON = {"unknown-recipient": "unknown recipient VV_XYZ", "sender-mismatch": "APAC_SOURCE VV_ACV does not match"}
-GEMS_TOPIC_MODE = {   # sent with router.gems.mode = topic: one copy per foreign recipient
-    "gems-topic-mode": ("rabbitmq", "tr.vnm.vna.sgp.caas.dev.swim.v1.filing.request", {"APAC_SOURCE": "VV_HVN", "APAC_RECIPIENT_LIST": "WS_CAAS,VT_AEROTHAI"},
-                        {GEMS: [("tr.vnm.vna.sgp.caas.dev.swim.v1.filing.request", "GEMS"),
-                                ("tr.vnm.vna.tha.aerothai.dev.swim.v1.filing.request", "GEMS")]}),
+                  "q/vnm/vna/dev/swim/reply", (SOLACE_HEADER, "tr/vnm/vna/vnm/vatm/dev/swim/v1/filing/request")),
 }
 
 TLS = ssl._create_unverified_context()  # NiFi's certificate is self-signed
@@ -171,36 +168,33 @@ class TestGroup:
         api("DELETE", f"/process-groups/{self.id}?version={g['revision']['version']}")
 
 
-
-def set_parameter(ctx, name, value):
-    c = api("GET", f"/parameter-contexts/{ctx}")
-    r = api("POST", f"/parameter-contexts/{ctx}/update-requests", {"revision": c["revision"], "id": ctx, "component": {
-        "id": ctx, "parameters": [{"parameter": {"name": name, "value": value}}]}})["request"]
-    while not r["complete"]:
-        time.sleep(0.5)
-        r = api("GET", f"/parameter-contexts/{ctx}/update-requests/{r['requestId']}")["request"]
-    api("DELETE", f"/parameter-contexts/{ctx}/update-requests/{r['requestId']}")
-    if r.get("failureReason"):
-        raise RuntimeError(f"could not set parameter {name}: {r['failureReason']}")
-
-
-def check(label, headers, body, changes, out_stamp):
+def check(label, headers, props, body, sent, only_sent):
+    """Compare one arrival with what was sent. only_sent: no header may arrive that was not sent."""
+    changes, corr, reply, message_id = sent
     print(f"\n{label}")
     failures = 0
+
+    def report(ok, name, got, want):
+        nonlocal failures
+        failures += not ok
+        print(f"  {'OK  ' if ok else 'FAIL'} {name:27} {got!r}" + ("" if ok else f"  (expected {want})"))
+
     expected = {**HEADERS, **changes}
-    stamp = re.escape(expected.pop("APAC_TIMESTAMP")) + r",VV_EEMS_IN:\d+" + (r",VV_EEMS_OUT:\d+" if out_stamp else "") + "$"
     for name, want in expected.items():
-        got = headers.get(name)
-        failures += got != want
-        print(f"  {'OK  ' if got == want else 'FAIL'} {name:27} {got!r}" + ("" if got == want else f"  (expected {want!r})"))
-    got = headers.get("APAC_TIMESTAMP", "")
-    good = bool(re.match(stamp, got))
-    failures += not good
-    print(f"  {'OK  ' if good else 'FAIL'} {'APAC_TIMESTAMP':27} {got!r}" + ("" if good else f"  (expected {stamp})"))
-    same = body == PAYLOAD
-    failures += not same
-    print(f"  {'OK  ' if same else 'FAIL'} payload: {len(body)} bytes, sha256 {hashlib.sha256(body).hexdigest()[:16]}"
-          f" (sent {len(PAYLOAD)} bytes, sha256 {hashlib.sha256(PAYLOAD).hexdigest()[:16]})")
+        report(headers.get(name) == want, name, headers.get(name), repr(want))
+    if only_sent:
+        extra = sorted(set(headers) - set(expected))
+        report(not extra, "no other header", extra, "none")
+    else:
+        report("VV_ROUTE" not in headers, "VV_ROUTE", headers.get("VV_ROUTE"), "absent")
+    report(props["correlation_id"] == corr, "correlation-id", props["correlation_id"], repr(corr))
+    report(props["content_type"] == CONTENT_TYPE, "content-type", props["content_type"], repr(CONTENT_TYPE))
+    report(props["reply_to"] == reply, "reply-to", props["reply_to"], repr(reply) if reply else "absent")
+    # A sent message-id must arrive as is; without one, Solace's own JMS message id is used.
+    want_id = props["message_id"] == message_id if message_id else bool(props["message_id"])
+    report(want_id, "message-id", props["message_id"], repr(message_id) if message_id else "set")
+    report(body == PAYLOAD, "payload", f"{len(body)} bytes, sha256 {hashlib.sha256(body).hexdigest()[:16]}",
+           f"{len(PAYLOAD)} bytes, sha256 {hashlib.sha256(PAYLOAD).hexdigest()[:16]}")
     return failures
 
 
@@ -215,20 +209,28 @@ def main():
            "Username": "#{rabbitmq.username}", "Password": "#{rabbitmq.password}"}
     gen, text, names = "org.apache.nifi.processors.standard.GenerateFlowFile", PAYLOAD.decode(), "|".join(HEADERS)
     vh, enc = urllib.parse.quote(t.vhost, safe=""), lambda name: urllib.parse.quote(name, safe="")
-    mode_changed, drain = False, None
+    drain = None
     try:
         p_sol = t.processor("org.apache.nifi.jms.processors.PublishJMS", "publish to Solace", 0, 300, {**sol,
             "Destination Name": "${topic}", "Destination Type": "TOPIC", "Message Body Type": "text",
-            "Attributes to Send as JMS Headers": names + "|contentType|jms_correlationId"}, auto=["success"])
-        p_rmq = t.processor("org.apache.nifi.amqp.processors.PublishAMQP", f"publish to {INGRESS}", 500, 300, {**rmq,
-            "Exchange Name": INGRESS, "Routing Key": "${rk}", "Delivery Guarantee": "AT_LEAST_ONCE",
-            "Headers Source": "FLOWFILE_ATTRIBUTES", "Headers Pattern": names}, auto=["success"])
+            "Attributes to Send as JMS Headers": names + "|contentType|messageId|jms_correlationId|jms_replyTo"}, auto=["success"])
+        p_rmq = t.processor("org.apache.nifi.amqp.processors.PublishAMQP", "publish to ${exchange} as the Router would", 500, 300, {**rmq,
+            "Exchange Name": "${exchange}", "Routing Key": "${rk}", "Delivery Guarantee": "AT_LEAST_ONCE",
+            "Headers Source": "FLOWFILE_ATTRIBUTES", "Headers Pattern": names + "|VV_ROUTE"}, auto=["success"])
         senders = {}
-        for i, (name, (side, address, changes, _)) in enumerate({**SCENARIOS, **GEMS_TOPIC_MODE}.items()):
+        for i, (name, (side, address, changes, reply, _)) in enumerate(SCENARIOS.items()):
             corr = f"{RUN}-{name}"
             props = {**HEADERS, **changes, "Custom Text": text}
-            props.update({"topic": address, "contentType": "application/xml", "jms_correlationId": corr} if side == "solace" else
-                         {"rk": address, "amqp$contentType": "application/xml", "amqp$correlationId": corr, "amqp$messageId": corr})
+            if side == "solace":
+                props.update({"topic": address, "contentType": CONTENT_TYPE, "jms_correlationId": corr})
+                props.update({"jms_replyTo": reply} if reply else {})
+                props.update({"messageId": corr} if name in SOLACE_MESSAGE_ID else {})
+            else:
+                topic_routing = address.startswith("t.")
+                props.update({"exchange": SWIM if topic_routing else ROUTE, "rk": address, "amqp$contentType": CONTENT_TYPE,
+                              "amqp$correlationId": corr, "amqp$messageId": corr})
+                props.update({} if topic_routing else {"VV_ROUTE": "VV_VATM"})
+                props.update({"amqp$replyTo": reply} if reply else {})
             senders[name] = t.processor(gen, f"make {name}", i * 250, 0, props, period="1 day")
             t.connect(senders[name], p_sol if side == "solace" else p_rmq, ["success"])
         s_topic = t.processor("org.apache.nifi.jms.processors.ConsumeJMS", f"subscribe {SOLACE_TOPIC}", 1000, 300, {**sol,
@@ -263,60 +265,50 @@ def main():
             return json.loads(body)
 
         def arrivals():
-            """[(scenario, where, routing key or topic, headers, payload)] for this run's messages."""
+            """[(scenario, where, routing key or topic, headers, properties, payload)] for this run's messages."""
             out = []
-            for queue in (VNA, GEMS, DLQ, UNROUTED):
-                for m in peek(queue):
-                    corr = m["properties"].get("correlation_id", "")
-                    if corr.startswith(RUN + "-"):
-                        out.append((corr[len(RUN) + 1:], queue, m["routing_key"], m["properties"].get("headers", {}), base64.b64decode(m["payload"])))
+            for m in peek(ROUTER_IN):
+                p = m["properties"]
+                corr = p.get("correlation_id", "")
+                if corr.startswith(RUN + "-"):
+                    props = {k: p.get(k) for k in ("message_id", "correlation_id", "content_type", "reply_to")}
+                    out.append((corr[len(RUN) + 1:], ROUTER_IN, m["routing_key"], p.get("headers", {}), props, base64.b64decode(m["payload"])))
             for where, c in c_sol.items():
                 for attrs, content in t.flowfiles(c):
                     corr = attrs.get("jms_correlationId", "")
                     if corr.startswith(RUN + "-"):
-                        out.append((corr[len(RUN) + 1:], where, attrs.get("jms_destination"), attrs, content))
+                        props = {"message_id": attrs.get("messageId"), "correlation_id": corr,
+                                 "content_type": attrs.get("contentType"), "reply_to": attrs.get("jms_replyTo")}
+                        out.append((corr[len(RUN) + 1:], where, attrs.get("jms_destination"), attrs, props, content))
             return out
 
-        def send_and_check(scenarios):
-            for name in scenarios:
-                t.state(senders[name], "RUN_ONCE")
-            want = sum(len(v) for _, _, _, dest in scenarios.values() for v in dest.values())
-            wait(lambda: len([a for a in arrivals() if a[0] in scenarios]) >= want, 60)
-            time.sleep(5)  # a copy that should not exist has time to show up
-            got = [a for a in arrivals() if a[0] in scenarios]
-            failures = 0
-            for name, (side, address, changes, dest) in scenarios.items():
-                expected = sorted((w, key, route) for w, copies in dest.items() for key, route in copies)
-                mine = sorted((a for a in got if a[0] == name), key=lambda a: (a[1], a[2]))
-                actual = sorted((a[1], a[2], a[3].get("VV_ROUTE")) for a in mine)
-                ok = actual == expected
-                failures += not ok
-                print(f"\n== {name}: {side} {address}, APAC_RECIPIENT_LIST={changes.get('APAC_RECIPIENT_LIST', HEADERS['APAC_RECIPIENT_LIST'])}")
-                print(f"  {'OK  ' if ok else 'FAIL'} arrived at {[(w, k) for w, k, _ in actual]}" + ("" if ok else f"\n       expected {[(w, k) for w, k, _ in expected]}"))
-                for _, where, key, headers, body in mine:
-                    failures += check(f"  {where}  ({key}, VV_ROUTE={headers.get('VV_ROUTE')})", headers, body, changes, where != DLQ)
-                    if where == DLQ:
-                        reason = headers.get("VV_DLX_REASON", "")
-                        good = DLQ_REASON[name] in reason
-                        failures += not good
-                        print(f"  {'OK  ' if good else 'FAIL'} {'VV_DLX_REASON':27} {reason!r}")
-            return failures
-
         def drain():
-            for queue in (VNA, GEMS, DLQ, UNROUTED):
-                held = peek(queue)
-                if held and all(m["properties"].get("correlation_id", "").startswith(RUN + "-") for m in held):
-                    rabbit("POST", f"queues/{vh}/{enc(queue)}/get", {"count": len(held), "ackmode": "ack_requeue_false", "encoding": "auto"})
-                elif any(m["properties"].get("correlation_id", "").startswith(RUN + "-") for m in held):
-                    print(f"\nNote: {queue} holds other messages too, so this run's messages were left there.")
+            held = peek(ROUTER_IN)
+            if held and all(m["properties"].get("correlation_id", "").startswith(RUN + "-") for m in held):
+                rabbit("POST", f"queues/{vh}/{enc(ROUTER_IN)}/get", {"count": len(held), "ackmode": "ack_requeue_false", "encoding": "auto"})
+            elif any(m["properties"].get("correlation_id", "").startswith(RUN + "-") for m in held):
+                print(f"\nNote: {ROUTER_IN} holds other messages too, so this run's messages were left there.")
 
         for pid in (http, s_topic, s_header, p_sol, p_rmq):
             t.state(pid, "RUNNING")
         time.sleep(5)  # let the Solace subscriptions settle
-        failures = send_and_check(SCENARIOS)
-        mode_changed = True
-        set_parameter(t.ctx, "router.gems.mode", "topic")
-        failures += send_and_check(GEMS_TOPIC_MODE)
+        for name in SCENARIOS:
+            t.state(senders[name], "RUN_ONCE")
+        wait(lambda: {a[0] for a in arrivals()} >= set(SCENARIOS), 60)
+        time.sleep(5)  # a copy that should not exist has time to show up
+        got = arrivals()
+        failures = 0
+        for name, (side, address, changes, reply, (where, key)) in SCENARIOS.items():
+            mine = [a for a in got if a[0] == name]
+            actual = sorted((a[1], a[2]) for a in mine)
+            ok = actual == [(where, key)]
+            failures += not ok
+            print(f"\n== {name}: {side} {address}, APAC_RECIPIENT_LIST={changes.get('APAC_RECIPIENT_LIST', HEADERS['APAC_RECIPIENT_LIST'])!r}")
+            print(f"  {'OK  ' if ok else 'FAIL'} arrived at {actual}" + ("" if ok else f"\n       expected {[(where, key)]}"))
+            for _, at, k, headers, props, body in mine:
+                corr = f"{RUN}-{name}"
+                message_id = None if side == "solace" and name not in SOLACE_MESSAGE_ID else corr
+                failures += check(f"  {at}  ({k})", headers, props, body, (changes, corr, reply, message_id), side == "solace")
         failures += sum(len(t.flowfiles(c)) for c in c_fail)
         print("\nPASS" if not failures else f"\nFAIL ({failures} problem(s))")
         return 0 if not failures else 1
@@ -325,11 +317,7 @@ def main():
             if drain:
                 drain()
         finally:
-            try:
-                if mode_changed:
-                    set_parameter(t.ctx, "router.gems.mode", "header")
-            finally:
-                t.remove()
+            t.remove()
 
 
 if __name__ == "__main__":

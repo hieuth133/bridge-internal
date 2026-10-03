@@ -38,7 +38,7 @@ _Avoid:_ Solace side, inside broker
 **External EMS** — The RabbitMQ broker in the DMZ. External EMSs and outside applications connect here.
 _Avoid:_ Rabbit side, DMZ broker
 
-**Bridge** — The application that moves messages between the Internal EMS and the External EMS, in both directions.
+**Bridge** — The application that moves messages between the Internal EMS and the External EMS, in both directions, without changing the payload, the headers or the message properties.
 _Avoid:_ connector, relay, shovel
 
 **Outbound** — The direction from the Internal EMS to the External EMS.
@@ -49,12 +49,15 @@ _Avoid:_ connector, relay, shovel
 
 **Routing key** — The name a message carries on the External EMS: the SWIM topic with `.` in place of `/` (see ADR 0005).
 
-**Router** — The step on the External EMS that every message passes through, in both directions. It checks the mandatory APAC headers, stamps `APAC_TIMESTAMP`, and sends a Pub/Sub message on by its Routing key and a Request/Reply message to each of its Recipient codes.
+**Router** — The step on the External EMS that every message passes through, in both directions. A separate application, not part of the Bridge. It checks the mandatory APAC headers, adds the EEMS stamps, and sends a Pub/Sub message on by its Routing key and a Request/Reply message to each of its Recipient codes.
 _Avoid:_ Bridge Rule, dispatcher
+
+**EEMS stamp** — An entry `VV_EEMS_IN:<ms>` or `VV_EEMS_OUT:<ms>` that the Router appends to the `APAC_TIMESTAMP` header when a message enters or leaves the External EMS. Apart from the sender, who creates the header, nothing else adds to it.
+_Avoid:_ bridge stamp
 
 **Recipient code** — One entry of the `APAC_RECIPIENT_LIST` header, `<ICAO prefix>_<organisation>`, for example `VV_VATM`, `VV_HVN`, `WS_CAAS`. Codes that start `VV_` are inside Viet Nam; every other code is reached through GEMS.
 
-**Route header** — The header `VV_ROUTE` that the Router puts on each copy of a Request/Reply message: one value per copy, the Recipient code, or `GEMS` for recipients outside Viet Nam.
+**Route header** — The header `VV_ROUTE` that the Router puts on each copy of a Request/Reply message: one value per copy, the Recipient code, or `GEMS` for recipients outside Viet Nam. It exists only inside the External EMS; the Bridge removes it before a message enters the Internal EMS.
 _Avoid:_ routing header, destination header
 
 **Topic routing** — Delivering a message by its SWIM topic or Routing key alone: Solace subscriptions and RabbitMQ topic bindings. Used for Pub/Sub.
