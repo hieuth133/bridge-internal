@@ -171,6 +171,7 @@ The two UIs count differently:
 | RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/router/in` | **Ready +1**, and it **stays**. This is the original copy, waiting for the Router. To see it: **Get messages**, Ack Mode `Nack message requeue true`; its `correlation_id` is the `bridge-test-...` value the script printed. The UI shows AMQP 1.0 fields under their old names: `correlation_id`, `content_type`, `delivery_mode: 2` for durable, and the application-properties as `headers`. |
 | RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/bridge-test/bridge-test-...` | The script's temporary queue (feature `Exp`), made over AMQP 1.0. It exists only for the few seconds the script runs, so you may not catch it. Afterwards it is gone. |
 | RabbitMQ: **Exchanges** → `x/vnm/vatm/dev/ingress` | A short bump in **Message rates** in and out. |
+| Solace: **Queues** → `q/vnm/vatm/dev/bridge/inbound` | **+1**, and it **stays**. This queue subscribes to every `t/vnm/>` and `tr/vnm/>` topic, so it also catches the message the script sends on Solace. This copy is the script's own message, not one the Bridge delivered: it proves nothing about B-04. |
 
 ### Scripts 4 and 5 (RabbitMQ → Solace)
 
@@ -180,7 +181,8 @@ The two UIs count differently:
 | RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/bridge/inbound` | **Ready** stays 0, because NiFi (B-03) takes the message straight away. **Message rates** shows a short bump in *Publish*, *Deliver* and *Ack*. If **Ready** stays at 1 or more, the Bridge is not reading. Today no other queue gets these two messages. |
 | RabbitMQ: **Queues and Streams** → `q/vnm/vatm/dev/eems/unrouted` | **No change.** If **Ready** goes up, the key (script 4) or the headers (script 5) matched no binding, so the message never reached the Bridge. |
 | Solace: **Queues** → **Topic Endpoints** tab | While the script waits (a few seconds), a temporary endpoint appears. It has a long generated name that contains the topic, for example `t/vnm/acv/dev/aodb/v1/departure/publish/vvts`, and it receives 1 message. It disappears when the script ends. |
-| Solace: **Queues** | **No change.** No durable queue on Solace subscribes to these two topics, so no total goes up. Queue `q/vnm/vna/dev/swim/reply` is only the reply-to *name* in script 5; nothing is sent to it. |
+| Solace: **Queues** → `q/vnm/vatm/dev/bridge/inbound` | **This is the proof that stays.** Total messages spooled **+1** and **Messages Queued +1**, and the message stays there, because nothing reads this queue. It subscribes to `t/vnm/>` and `tr/vnm/>`, so it holds a copy of every message B-03 puts on Solace. Browse it in the queue's **Messages Queued** tab: the topic is shown as the destination, and the `correlation-id` is the `bridge-test-...` value the script printed. It has the same name as the RabbitMQ queue that B-03 reads, but it is a separate queue on Solace. |
+| Solace: **Queues** → `q/vnm/vna/dev/swim/reply` | **No change.** It is only the reply-to *name* in script 5; nothing is sent to it. |
 
 **Note on `out-atfm`:** the old Bridge's Topic Endpoint `q/vnm/vatm/dev/bridge/out-atfm` subscribes to `t/vnm/vatm/dev/atfm/>` and has no consumer. Every run of script 2 therefore leaves one more message there, and so does every `atfm` message anyone sends. The root `README.md` ("Object cũ") explains how to delete it once it is no longer needed.
 
@@ -219,7 +221,8 @@ Each run uses its own correlation-id, `bridge-test-<time>`, so it only ever pick
 **The test messages are real messages.** Other queues on the same exchange also get a copy:
 - After scripts 2 and 3, a copy stays in `q/vnm/vatm/dev/router/in`. When the Router runs, it delivers that copy to the parties in `APAC_RECIPIENT_LIST`.
 - Script 2 also leaves a copy in the old Solace Topic Endpoint `q/vnm/vatm/dev/bridge/out-atfm`.
-- Scripts 4 and 5 reach only `q/vnm/vatm/dev/bridge/inbound` today. If someone later binds another queue to `swim` or `route` that matches, that queue gets a copy too.
+- Every script (2–5) leaves a copy in the Solace queue `q/vnm/vatm/dev/bridge/inbound`. Scripts 2 and 3 leave the message they sent on Solace; scripts 4 and 5 leave the message B-03 delivered. That includes `--recipients WS_CAAS`, because VATM's selector filters only what VATM receives, not what B-03 puts on Solace. Nothing reads this queue, so the copies pile up: delete them in Broker Manager (the queue's **Messages Queued** tab → **Delete All**) when you no longer need them.
+- On RabbitMQ, scripts 4 and 5 reach only `q/vnm/vatm/dev/bridge/inbound` today. If someone later binds another queue to `swim` or `route` that matches, that queue gets a copy too.
 
 Outside the `dev` environment, use `--recipients` with codes that are not real partners.
 
